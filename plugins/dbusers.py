@@ -36,7 +36,7 @@ class Database:
     async def delete_user(self, user_id):
         await self.col.delete_many({'id': int(user_id)})
 
-    # ─── STORE CHANNELS / STORIES METHODS (ASYNC MOTOR INTEGRATION) ───
+    # ─── STORE CHANNELS / STORIES METHODS ───
     async def get_stories_by_filter(self, query, skip, limit):
         """Asynchronously fetch filtered items from channels_col"""
         cursor = self.db.channels_col.find(query).skip(skip).limit(limit)
