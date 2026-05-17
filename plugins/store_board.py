@@ -82,9 +82,9 @@ async def get_store_pagination_markup(category_type, page=1):
     return ReplyKeyboardMarkup(keyboard_buttons, resize_keyboard=True)
 
 
-# ─── 3. INTERMEDIATE LAYOUT ENGINE (Dono flows ke liye same Details Card) ───
+# ─── 3. INTERMEDIATE LAYOUT ENGINE ───
 async def show_story_details_by_id(client, chat_id, data):
-    """Deep link ya keyboard click dono par pehle Cover Photo aur Confirm button dikhane ke liye"""
+    """Deep link ya keyboard click dono par pehle Premium Details aur CONFIRM button dikhane ke liye"""
     inline_markup = []
     db_id = str(data.get('item_id') or data.get('channel_id') or data.get('_id'))
 
@@ -97,21 +97,24 @@ async def show_story_details_by_id(client, chat_id, data):
         header = f"🔥 <b><u>✨ ᴘʀᴇᴍɪᴜᴍ ᴇxᴄʟᴜsɪᴠᴇ sᴛᴏʀỹ ({src_name}) ✨</u></b>"
         raw_lbl = data.get('story_name') or data.get('name') or 'Premium Story'
         item_label = raw_lbl.split("\n")[0].strip()
-        desc_text = "🤖 <b>ᴅᴇʟɪᴠᴇʀỹ:</b> <code><b>ɪɴsᴛᴀɴᴛ ʙᴏᴛ ʟɪɴᴋ ᴀᴄᴄᴇss</b></code>"
+        desc_text = f"📝 <b>sᴛᴏʀỹ ᴅᴇsᴄʀɪᴘᴛɪᴏɴ:</b>\n<i>{data.get('description', 'All chapters included instantly.')}</i>"
 
-    # ✅ Dono flows me pehle yehi single button dikhega jo payment file me lekar jayega
+    # ✅ Single standard button click karne par payment.py ka checkout summary active hoga
     inline_markup.append([InlineKeyboardButton("✅ CONFIRM", callback_data=f"pay_{db_id}")])
     
     if data.get('demo_link'):
-        inline_markup.append([InlineKeyboardButton("📺 ᴠɪᴇᴡ ǫᴜᴀʟɪᴛỹ ᴅᴇᴍᴏ", url=data['demo_link'])])
+        inline_markup.append([InlineKeyboardButton("📺 VIEW DEMO FILES", url=data['demo_link'])])
         
-    inline_markup.append([InlineKeyboardButton("⬅️ BACK TO LIST", callback_data="back_to_store_list")])
+    inline_markup.append([InlineKeyboardButton("🔙 BACK", callback_data="back_to_store_list")])
 
     details_layout = (
         f"{header}\n"
         "──────────────────────────\n"
-        f"📦 <b><u>ɪᴛᴇᴍ ɴᴀᴍᴇ:</u></b> <code>{item_label}</code>\n"
-        f"💰 <b><u>ᴘʀɪᴄᴇ:</u></b> <b>₹{data.get('price', '12')}</b>\n\n"
+        f"📦 <b>sᴛᴏʀỹ:</b> <code>{item_label}</code>\n"
+        f"📊 <b>sᴛᴀᴛᴜs:</b> <code>ᴄᴏᴍᴘʟᴇᴛᴇᴅ</code>\n"
+        f"💰 <b>ᴘʀɪᴄᴇ:</b> <b>₹{data.get('price', '12')}</b>\n"
+        f"🤖 <b>ᴅᴇʟɪᴠᴇʀỹ:</b> <code>ɪɴsᴛᴀɴᴛ ʙᴏᴛ ʟɪɴᴋ ᴀᴄᴄᴇss</code>\n"
+        "──────────────────────────\n"
         f"{desc_text}\n"
         "──────────────────────────"
     )
@@ -198,4 +201,38 @@ async def store_board_central_router(client, message):
                 data = await db.find_single_story({
                     "$or": [
                         {"story_name": {"$regex": re.escape(clean_name), "$options": "i"}},
-                        {"name": {"$regex": re.escape(clean_name), "$options": "i"}
+                        {"name": {"$regex": re.escape(clean_name), "$options": "i"}}
+                    ],
+                    "source": state["category"]
+                })
+                
+            if not data:
+                return await message.reply_text("❌ <i>Story Details nahi mil saki.</i>")
+
+        loading_alert = await message.reply_text("⏳ <i>Loading Story Details...</i>", reply_markup=ReplyKeyboardRemove())
+        try: 
+            await loading_alert.delete()
+        except: 
+            pass
+
+        await show_story_details_by_id(client, message.chat.id, data)
+
+
+# ─── 5. BACK TO LIST INLINE CALLBACK CONTROLLER ───
+@Client.on_callback_query(filters.regex("^back_to_store_list$"))
+async def process_return_store_callback(client, call):
+    user_id = call.from_user.id
+    await call.answer()
+    try: 
+        await call.message.delete()
+    except: 
+        pass
+        
+    state = USER_STORE_STATES.get(user_id, {"category": "pocket", "page": 1})
+    markup_keyboard = await get_store_pagination_markup(state["category"], page=state["page"])
+    
+    await client.send_message(
+        chat_id=call.message.chat.id, 
+        text="👇 <i>Apni pasand ka item select karke full access lein:</i>", 
+        reply_markup=markup_keyboard
+    )
