@@ -11,7 +11,7 @@ from pyrogram.types import (
     ReplyKeyboardRemove
 )
 from plugins.dbusers import db  # Database integration instance
-import config *
+import config 
 
 # Global processing tracking to monitor screenshot submissions
 USER_PAYMENT_STATES = {}
