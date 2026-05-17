@@ -90,7 +90,7 @@ async def start(client, message):
             return await message.reply_text(text="<b>Invalid link or Expired link !</b>", protect_content=True)
         return
 
-    # 2. HANDLE BATCH LINKS
+    # 2. HANDLE BATCH LINKS (Fully Fixed 🛠️)
     elif data.split("-", 1)[0] == "BATCH":
         try:
             if not await check_verification(client, message.from_user.id) and VERIFY_MODE == True:
@@ -108,80 +108,95 @@ async def start(client, message):
         except Exception as e:
             return await message.reply_text(f"**Error - {e}**")
             
-        sts = await message.reply("**🔺 ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ**")
+        sts = await message.reply("<b>PLEASE WAIT... ⏳</b>") # Exact video matching text
         file_id = data.split("-", 1)[1]
         msgs = BATCH_FILES.get(file_id)
+        
         if not msgs:
-            decode_file_id = base64.urlsafe_b64decode(file_id + "=" * (-len(file_id) % 4)).decode("ascii")
-            msg = await client.get_messages(LOG_CHANNEL, int(decode_file_id))
-            media = getattr(msg, msg.media.value)
-            file_id = media.file_id
-            file = await client.download_media(file_id)
-            try: 
-                with open(file) as file_data:
-                    msgs=json.loads(file_data.read())
-            except:
-                await sts.edit("FAILED")
-                return await client.send_message(LOG_CHANNEL, "UNABLE TO OPEN FILE.")
-            os.remove(file)
-            BATCH_FILES[file_id] = msgs
+            try:
+                # Padding automatic correct karke decode karega string ko
+                decode_file_id = base64.urlsafe_b64decode(file_id + "=" * (-len(file_id) % 4)).decode("ascii")
+                
+                # Agar generator file ID string ke sath 'file_' bhej raha ho to use clean karein
+                if "file_" in decode_file_id:
+                    decode_file_id = decode_file_id.replace("file_", "")
+                elif "_" in decode_file_id:
+                    decode_file_id = decode_file_id.split("_", 1)[1]
+                    
+                msg = await client.get_messages(LOG_CHANNEL, int(decode_file_id))
+                
+                # Log channel se direct json document file ko server par download karega
+                file = await client.download_media(msg)
+                
+                with open(file, "r") as file_data:
+                    msgs = json.loads(file_data.read())
+                
+                os.remove(file)
+                BATCH_FILES[file_id] = msgs
+            except Exception as e:
+                await sts.edit("<b>FAILED TO FETCH BATCH DATA ❌</b>")
+                return await client.send_message(LOG_CHANNEL, f"UNABLE TO OPEN BATCH FILE: {str(e)}")
             
         filesarr = []
-        for msg in msgs:
-            channel_id = int(msg.get("channel_id"))
-            msgid = msg.get("msg_id")
-            info = await client.get_messages(channel_id, int(msgid))
-            if info.media:
-                file_type = info.media
-                file = getattr(info, file_type.value)
-                f_caption = getattr(info, 'caption', '')
-                if f_caption:
-                    f_caption = f"@VJ_Bots {f_caption.html}"
-                old_title = getattr(file, "file_name", "Media File")
-                title = formate_file_name(old_title)
+        for msg_item in msgs:
+            try:
+                channel_id = int(msg_item.get("channel_id"))
+                msgid = int(msg_item.get("msg_id"))
+                info = await client.get_messages(channel_id, msgid)
                 
-                size = get_size(int(file.file_size)) if hasattr(file, "file_size") else "Unknown"
-                if BATCH_FILE_CAPTION:
-                    try:
-                        f_caption=BATCH_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
-                    except:
-                        f_caption=f_caption
-                if f_caption is None:
-                    f_caption = f"@VJ_Bots {title}"
-                if STREAM_MODE == True:
-                    if info.video or info.document:
-                        log_msg = info
-                        stream = f"{URL}watch/{str(log_msg.id)}/{quote_plus(get_name(log_msg))}?hash={get_hash(log_msg)}"
-                        download = f"{URL}{str(log_msg.id)}/{quote_plus(get_name(log_msg))}?hash={get_hash(log_msg)}"
+                if info.empty or info.service:
+                    continue
+                    
+                if info.media:
+                    file_type = info.media
+                    file = getattr(info, file_type.value)
+                    f_caption = getattr(info, 'caption', '')
+                    if f_caption:
+                        f_caption = f"@VJ_Bots {f_caption.html}"
+                    old_title = getattr(file, "file_name", "Media File")
+                    title = formate_file_name(old_title)
+                    
+                    size = get_size(int(file.file_size)) if hasattr(file, "file_size") else "Unknown"
+                    if BATCH_FILE_CAPTION:
+                        try:
+                            f_caption = BATCH_FILE_CAPTION.format(file_name='' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
+                        except:
+                            f_caption = f_caption
+                    if f_caption is None:
+                        f_caption = f"@VJ_Bots {title}"
+                        
+                    if STREAM_MODE == True and (info.video or info.document):
+                        stream = f"{URL}watch/{str(info.id)}/{quote_plus(get_name(info))}?hash={get_hash(info)}"
+                        download = f"{URL}{str(info.id)}/{quote_plus(get_name(info))}?hash={get_hash(info)}"
                         button = [[
                             InlineKeyboardButton("• ᴅᴏᴡɴʟᴏᴀᴅ •", url=download),
                             InlineKeyboardButton('• ᴡᴀᴛᴄʜ •', url=stream)
                         ],[
                             InlineKeyboardButton("• ᴡᴀᴛᴄʜ ɪɴ ᴡᴇʙ ᴀᴘᴘ •", web_app=WebAppInfo(url=stream))
                         ]]
-                        reply_markup=InlineKeyboardMarkup(button)
+                        reply_markup = InlineKeyboardMarkup(button)
+                    else:
+                        reply_markup = None
+                        
+                    msg_out = await info.copy(chat_id=message.from_user.id, caption=f_caption, protect_content=False, reply_markup=reply_markup)
                 else:
-                    reply_markup = None
-                try:
-                    msg = await info.copy(chat_id=message.from_user.id, caption=f_caption, protect_content=False, reply_markup=reply_markup)
-                except FloodWait as e:
-                    await asyncio.sleep(e.value)
-                    msg = await info.copy(chat_id=message.from_user.id, caption=f_caption, protect_content=False, reply_markup=reply_markup)
-                except:
-                    continue
-            else:
-                try:
-                    msg = await info.copy(chat_id=message.from_user.id, protect_content=False)
-                except FloodWait as e:
-                    await asyncio.sleep(e.value)
-                    msg = await info.copy(chat_id=message.from_user.id, protect_content=False)
-                except:
-                    continue
-            filesarr.append(msg)
-            await asyncio.sleep(1) 
+                    msg_out = await info.copy(chat_id=message.from_user.id, protect_content=False)
+                
+                filesarr.append(msg_out)
+                await asyncio.sleep(1) # Floodwait se bachne ke liye interval delay
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+                # Retry copy process post flood timeout window
+                msg_out = await info.copy(chat_id=message.from_user.id, protect_content=False)
+                filesarr.append(msg_out)
+            except Exception as e:
+                logger.error(f"Error copying batch sub-file: {e}")
+                continue
+                
         await sts.delete()
+        
         if AUTO_DELETE_MODE == True:
-            k = await client.send_message(chat_id = message.from_user.id, text=f"<b><u>❗️❗️❗️IMPORTANT❗️️❗️❗️</u></b>\n\nThis Movie File/Video will be deleted in <b><u>{AUTO_DELETE} minutes</u> 🫥 <i></b>(Due to Copyright Issues)</i>.\n\n<b><i>Please forward this File/Video to your Saved Messages and Start Download there</b>")
+            k = await client.send_message(chat_id=message.from_user.id, text=f"<b><u>❗️❗️❗️IMPORTANT❗️️❗️❗️</u></b>\n\nThis Movie File/Video will be deleted in <b><u>{AUTO_DELETE} minutes</u> 🫥 <i></b>(Due to Copyright Issues)</i>.\n\n<b><i>Please forward this File/Video to your Saved Messages and Start Download there</b>")
             await asyncio.sleep(AUTO_DELETE_TIME)
             for x in filesarr:
                 try:
@@ -191,7 +206,7 @@ async def start(client, message):
             await k.edit_text("<b>Your All Files/Videos is successfully deleted!!!</b>")
         return
 
-    # 3. HANDLE SINGLE FILE / PHOTO LINKS (FIXED BLOCK)
+    # 3. HANDLE SINGLE FILE / PHOTO LINKS
     if not await check_verification(client, message.from_user.id) and VERIFY_MODE == True:
         btn = [[
             InlineKeyboardButton("Verify", url=await get_token(client, message.from_user.id, f"https://telegram.me/{username}?start="))
@@ -206,27 +221,22 @@ async def start(client, message):
         return
 
     try:
-        # Base64 data ko robust tarike se decode karein padding issue handle karke
         decoded_bytes = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
         decoded_str = decoded_bytes.decode("ascii")
         
-        # Agar string mein "file_" laga hai to use remove karke clean message ID nikalenge
         if "file_" in decoded_str:
             decode_file_id = decoded_str.replace("file_", "")
         else:
-            # Safe side fallback agar direct underscore format ho string mein
             decode_file_id = decoded_str.split("_", 1)[1] if "_" in decoded_str else decoded_str
             
         msg = await client.get_messages(LOG_CHANNEL, int(decode_file_id))
         
         if msg.media:
             media = getattr(msg, msg.media.value)
-            # Photo list format mein hoti hai isiliye check add kiya taaki bot crash na ho
             old_title = media.file_name if hasattr(media, "file_name") else "Photo File"
             title = formate_file_name(old_title)
             size = get_size(media.file_size) if hasattr(media, "file_size") else "Unknown"
             
-            # Caption format
             f_caption = f"@VJ_Bots <code>{title}</code>"
             if CUSTOM_FILE_CAPTION:
                 try:
@@ -262,7 +272,6 @@ async def start(client, message):
             await k.edit_text("<b>Your File/Video is successfully deleted!!!</b>")
         return
     except Exception as e:
-        # Debugging ke liye log karega agar abhi bhi koi aur exception aati hai to
         logger.error(f"Error in single file delivery: {str(e)}")
         pass
 
@@ -317,7 +326,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         reply_markup = InlineKeyboardMarkup(buttons)
         me2 = (await client.get_me()).mention
         await query.message.edit_text(
-            text=script.ABOUT_TXT.format(me2),
+            text=script.START_TXT.format(me2),
             reply_markup=reply_markup,
             parse_mode=enums.ParseMode.HTML
         )
