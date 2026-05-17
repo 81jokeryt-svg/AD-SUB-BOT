@@ -363,7 +363,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
             [InlineKeyboardButton("{ CLOSE }", callback_data="close_data")]
         ]
         await query.message.reply_photo(
-            photo="https://graph.org/file/e6162a74c6d67b2fc809d.jpg", 
+            photo="https://i.ibb.co/PGbZztgZ/photo-2026-05-04-16-41-38-7636287934861148164.jpg", 
             caption=script.QR_REPLY_TEXT,
             reply_markup=InlineKeyboardMarkup(qr_buttons)
         )
