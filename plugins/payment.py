@@ -16,12 +16,9 @@ import config
 # Global processing tracking to monitor screenshot submissions
 USER_PAYMENT_STATES = {}
 
-# ===================================================
-# --- EXTRA CONFIG: FRESH START MENU RE-LOAD ---
-# ===================================================
 async def send_home_menu(client, chat_id):
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="back_to_start")]
+        [InlineKeyboardButton("« ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="start")]
     ])
     await client.send_message(
         chat_id=chat_id,
@@ -31,27 +28,24 @@ async def send_home_menu(client, chat_id):
     )
 
 
-# --- 1. UNIFIED PAYMENT GATEWAY ROUTER (REDIRECTED FROM CONFIRM BUTTON) ---
+# --- 1. UNIFIED PAYMENT GATEWAY ROUTER ---
 @Client.on_callback_query(filters.regex("^pay_"))
 async def confirm_step(client, call):
-    """Deep Link ya Keyboard dono se Confirm dabane par ek jaisa Secure Checkout layout khulega"""
-    db_id = call.data.split('_')[1]
+    db_id = call.data.split('_', 1)[1]
     await call.answer("🔒 Securing connection Gateway...", show_alert=False)
     
-    # Motor connection lookup matching core schema references
     data = await db.db.channels_col.find_one({"item_id": db_id}) or \
            await db.db.channels_col.find_one({"channel_id": int(db_id) if db_id.replace('-','').isdigit() else 0})
     
     if not data: 
         return await call.answer(f"❌ Data not found! (ID: {db_id})", show_alert=True)
 
-    # Dynamic pricing validation rules setup
     if data.get('is_combo'):
-        price = data['price']
+        price = data.get('price', '49')
         display_name = data.get('combo_name', 'Premium Combo')
         mins = "manual"
     elif 'story_name' in data:
-        price = data['price']
+        price = data.get('price', '49')
         display_name = data.get('story_name').split("\n")[0].strip()
         mins = "manual"
     else:
@@ -59,7 +53,6 @@ async def confirm_step(client, call):
         price = data.get('price', '49')
         display_name = data.get('name', 'Premium Channel')
     
-    # Premium Layout with Razorpay (Maintenance Alert mapped) & Manual Payment Selection
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("🚀 PAY VIA RAZORPAY", callback_data=f"razor_alert_{db_id}")],
         [InlineKeyboardButton("📸 PAY VIA QR SCAN", callback_data=f"man_{db_id}_{mins}_qr")],
@@ -73,7 +66,7 @@ async def confirm_step(client, call):
         "──────────────────────────\n"
         f"📦 <b>ɪᴛᴇᴍ:</b> <code>{display_name}</code>\n"
         f"💰 <b>ᴛᴏᴛᴀʟ ᴘʀɪᴄᴇ:</b> <b>₹{price}</b>\n\n"
-        "✅ <b><u>ᴀᴜᴛᴏᴍᴀᴛɪᴄ ᴘᴀỹᴍᴇɴᴛ (...ʀᴀᴢᴏʀᴘᴀỹ)</u></b>\n"
+        "✅ <b><u>ᴀᴜᴛᴏᴍᴀᴛɪᴄ ᴘᴀỹᴍᴇɴᴛ (ʀᴀᴢᴏʀᴘᴀỹ)</u></b>\n"
         "➔ <b>ʙᴇɴᴇғɪᴛs:</b> Instant Access (No waiting)\n\n"
         "📝 <b><u>ᴍᴀɴᴜᴀʟ ᴘᴀỹᴍᴇɴᴛ (ǫʀ & ᴜᴘɪ ɪᴅ)</u></b>\n"
         "➔ <b>ᴘʀᴏᴄᴇss:</b> Pay ➔ Send Screenshot\n"
@@ -88,7 +81,7 @@ async def confirm_step(client, call):
     await client.send_message(call.message.chat.id, text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
 
 
-# --- 2. RAZORPAY TEMPORARY MAINTENANCE POPUP CONTROLLER ---
+# --- 2. RAZORPAY TEMPORARY MAINTENANCE ---
 @Client.on_callback_query(filters.regex("^razor_alert_"))
 async def razorpay_alert_handler(client, call):
     await call.answer(
@@ -111,7 +104,7 @@ async def manual_pay(client, call):
     if not data:
         return await call.answer("❌ Data Error on Payment!", show_alert=True)
 
-    price = data['price'] if (data.get('is_combo') or 'story_name' in data) else data.get('price', '49')
+    price = data.get('price', '49')
     display_name = data.get('combo_name') or data.get('story_name') or data.get('name', 'Premium Item')
     clean_title = display_name.split("\n")[0].strip()
         
@@ -141,7 +134,7 @@ async def manual_pay(client, call):
         await client.send_photo(call.message.chat.id, qr_url, caption=qr_caption, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
     else:
         upi_layout = (
-            "📲 <b><u>[ ᴄ...ᴏᴍᴘʟᴇᴛᴇ ᴘᴀỹᴍᴇɴᴛ ]</u></b>\n\n"
+            "📲 <b><u>[ ᴄᴏᴍᴘʟᴇᴛᴇ ᴘᴀỹᴍᴇɴᴛ ]</u></b>\n\n"
             "<b>🎯 Copy UPI ID & Pay Manual</b>\n"
             "──────────────────────────\n"
             f"💳 <b>ᴜᴘɪ ɪᴅ:</b> <code>{config.UPI_ID}</code> (Tap to Copy)\n"
@@ -179,7 +172,6 @@ async def handle_paid(client, call):
     USER_PAYMENT_STATES[call.from_user.id] = {"item_id": db_id, "mins": mins, "awaiting_screenshot": True}
 
 
-# Central tracking pipeline listening exclusively for screenshot upload actions
 @Client.on_message(filters.private & filters.incoming, group=2)
 async def payment_screenshot_handler(client, message):
     user_id = message.from_user.id
@@ -213,11 +205,11 @@ async def payment_screenshot_handler(client, message):
     if not data:
         return await message.reply_text("❌ Something went wrong, item not found!")
 
-    display_name = data.get('combo_name') or data.get('story_name') or data.get('name')
+    display_name = data.get('combo_name') or data.get('story_name') or data.get('name', 'Premium Content')
     if display_name and "\n" in display_name:
         display_name = display_name.split("\n")[0].strip()
 
-    await message.reply_text("⏳ <b>ʀᴇǫᴜᴇsᴛ sᴇɴᴛ!</b>\nAdmin check karke aapka access on kar dega.", parse_mode=enums.ParseMode.HTML)
+    await message.reply_text("⏳ <b><b>ʀᴇǫᴜᴇsᴛ sᴇɴᴛ!</b></b>\nAdmin check karke aapka access on kar dega.", parse_mode=enums.ParseMode.HTML)
     
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve", callback_data=f"app_{user_id}_{item_id}_{mins}")],
@@ -225,7 +217,7 @@ async def payment_screenshot_handler(client, message):
          InlineKeyboardButton("💬 Support", url=f"tg://openmessage?user_id={user_id}")]
     ])
     
-    admin_text = f"📥 <b>ɴᴇᴡ ᴘᴀỹᴍᴇɴᴛ ʀᴇǫᴜᴇsᴛ</b>\n────────────────────\n👤 User ID: <code>{user_id}</code>\n📦 Item: <b>{display_name}</b>\n⏳ Plan: {mins if mins != 'manual' else 'Lifetime'}"
+    admin_text = f"📥 <b><b>ɴᴇᴡ ᴘᴀỹᴍᴇɴᴛ ʀᴇǫᴜᴇsᴛ</b></b>\n────────────────────\n👤 User ID: <code>{user_id}</code>\n📦 Item: <b>{display_name}</b>\n⏳ Plan: {mins if mins != 'manual' else 'Lifetime'}"
     await client.send_photo(chat_id=config.ADMIN_ID, photo=photo_id, caption=admin_text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
 
 
@@ -258,60 +250,41 @@ async def admin_approve(client, call):
     expiry = int(time.time()) + (int(mins) * 60) if mins != 'manual' else int(time.time()) + (365*24*60*60)
     inline_buttons = []
 
-    # ─── CASE A: COMBO PACK DISTRIBUTION PIPELINE ───
     if data.get('is_combo') and 'channels_list' in data:
-        msg = "🎁 <b>ᴄ...ᴏᴍʙᴏ ᴘᴀᴄᴋ ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\nAapko sabhi linked channels ka access de diya gaya hai. Niche diye buttons se join karein:\n\n"
+        msg = "🎁 <b>ᴄᴏᴍʙᴏ ᴘᴀᴄᴋ ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\nAapko sabhi linked channels ka access de diya gaya hai. Niche diye buttons se join karein:\n\n"
         for ch_id in data['channels_list']:
             await db.db.users_col.update_one({"user_id": int(u_id), "channel_id": int(ch_id)}, {"$set": {"expiry": expiry}}, upsert=True)
             try:
                 invite = await client.create_chat_invite_link(int(ch_id), member_limit=1)
                 ch_info = await db.db.channels_col.find_one({"channel_id": int(ch_id)})
-                
                 ch_title = ch_info.get('name') or ch_info.get('story_name') if ch_info else f"VIP Channel {ch_id}"
-                if ch_title and "\n" in ch_title:
-                    ch_title = ch_title.split("\n")[0].strip()
-                
                 inline_buttons.append([InlineKeyboardButton(f"📢 Join: {ch_title}", url=invite.invite_link)])
             except Exception as e:
                 print(f"Combo Link Error: {e}")
         msg += "⚠️ <i>Links single-use hain, ek baar join hone ke baad automatic expire ho jayengi!</i>"
 
-    # ─── CASE B: ROUTED GENERAL TELEGRAM CHANNEL ───
     elif data.get('type') == 'channel' or ('channel_id' in data and data.get('source') not in ['pocket', 'pratilipi'] and not data.get('is_combo')):
         target_channel = int(data['channel_id'])
         await db.db.users_col.update_one({"user_id": int(u_id), "channel_id": target_channel}, {"$set": {"expiry": expiry}}, upsert=True)
         try:
             invite = await client.create_chat_invite_link(chat_id=target_channel, member_limit=1)
             inline_buttons.append([InlineKeyboardButton("🔐 JOIN PREMIUM CHANNEL", url=invite.invite_link)])
-            
-            validity_display = data.get('validity', mins)
-            msg = (
-                f"✅ <b>ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\n"
-                f"📂 <b>ᴄʜᴀɴɴᴇʟ:</b> <b>{data.get('name', 'VIP Channel')}</b>\n"
-                f"⏱️ <b>ᴠᴀʟɪᴅɪᴛỹ:</b> {validity_display if validity_display != 'manual' else 'Lifetime'}\n\n"
-                f"Join karne ke liye neeche button par click karein:\n\n"
-                f"⚠️ <i>Yeh link single use hai, ek baar use hone ke baad automatic expire ho jayegi!</i>"
-            )
-        except Exception as e: 
-            print(f"Error: {e}")
+            msg = f"✅ <b>ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\n📂 <b>ᴄʜᴀɴɴᴇʟ:</b> <b>{data.get('name', 'VIP Channel')}</b>\n\nJoin karne ke liye neeche button par click karein:"
+        except: 
             msg = "✅ <b>ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\nBot link generate nahi kar saka, admin rights setup check karein."
 
-    # ─── CASE C: PREMIUM STORY INTERNAL FLOW ───
     else:
         await db.db.users_col.update_one({"user_id": int(u_id), "channel_id": data.get('channel_id', 0)}, {"$set": {"expiry": expiry}}, upsert=True)
         target_link = data.get('bot_link') or data.get('final_link') or 'https://t.me'
-        
         inline_buttons.append([InlineKeyboardButton("🚀 sᴛᴀʀᴛ sᴛᴏʀỹ", url=target_link)])
         
         raw_story_name = data.get('story_name', 'Premium Story')
         clean_story_name = raw_story_name.split('\n')[0].strip()
-        platform_info = f"\n📂 Platform: <code>{data.get('source')}</code>" if data.get('source') else ""
         
         msg = (
             f"🎉 <b>ᴘᴀỹᴍᴇɴᴛ ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n"
             f"────────────────────\n"
-            f"📖 <b>sᴛᴏʀỹ:</b> {clean_story_name}"
-            f"{platform_info}\n"
+            f"📖 <b>sᴛᴏʀỹ:</b> {clean_story_name}\n"
             f"💰 <b>ᴘʀɪᴄɪɴɢ:</b> ₹{data.get('price', '49')}\n"
             f"────────────────────\n"
             f"➔ Niche diye gaye button par click karke apni full story access karein 👇"
@@ -326,22 +299,23 @@ async def admin_approve(client, call):
     except Exception as e:
         print(f"Delivery Error: {e}")
         
-    admin_caption = f"✅ Approved for User: {u_id}"
-    await client.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.id,
-        caption=admin_caption
-    )
+    try:
+        if call.message.photo:
+            await call.message.edit_caption(caption=f"✅ Approved for User: {u_id}")
+        else:
+            await call.message.edit_text(text=f"✅ Approved for User: {u_id}")
+    except:
+        pass
 
 
 @Client.on_callback_query(filters.regex("^rej_"))
 async def admin_reject(client, call):
     u_id = call.data.split('_')[1]
-    
-    reject_caption = "❌ Payment Rejected!"
-    await client.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.id,
-        caption=reject_caption
-    )
+    try:
+        if call.message.photo:
+            await call.message.edit_caption(caption="❌ Payment Rejected!")
+        else:
+            await call.message.edit_text(text="❌ Payment Rejected!")
+    except:
+        pass
     await client.send_message(chat_id=int(u_id), text="❌ Aapka payment reject ho gaya hai. Support se baat karein.")
