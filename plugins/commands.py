@@ -24,14 +24,8 @@ logger = logging.getLogger(__name__)
 
 BATCH_FILES = {}
 
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-
-
 def get_size(size):
     """Get size in readable format"""
-
     units = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB"]
     size = float(size)
     i = 0
@@ -47,10 +41,6 @@ def formate_file_name(file_name):
     file_name = '@VJ_Botz ' + ' '.join(filter(lambda x: not x.startswith('http') and not x.startswith('@') and not x.startswith('www.'), file_name.split()))
     return file_name
 
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ0
-
 
 @Client.on_message(filters.command("start") & filters.incoming)
 async def start(client, message):
@@ -58,8 +48,9 @@ async def start(client, message):
     if not await db.is_user_exist(message.from_user.id):
         await db.add_user(message.from_user.id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT.format(message.from_user.id, message.from_user.mention))
+    
+    # 🌟 IF NO ARGUMENTS: Send Base Welcome Keyboard Layer
     if len(message.command) != 2:
-        # 🔥 UPDATED LAYOUT: Sabsé upar Premium Store ka Button set kar diya hai
         buttons = [
             [InlineKeyboardButton("🛍️ ᴏᴘᴇɴ ᴇxᴄʟᴜsɪᴠᴇ sᴛᴏʀᴇ 🛍️", callback_data="open_store")],
             [InlineKeyboardButton('💝 sᴜʙsᴄʀɪʙᴇ ᴍʏ ʏᴏᴜᴛᴜʙᴇ ᴄʜᴀɴɴᴇʟ', url='https://youtube.com/@Tech_VJ')],
@@ -84,16 +75,32 @@ async def start(client, message):
         )
         return
 
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-    
+    # 🌟 IF ARGUMENTS EXIST: Handle Premium Story Links & Verification
     data = message.command[1]
+    
+    # --- RULE: INTERCEPT UNIQUE CODES GENERATED FROM STORY CHANNELS ---
+    if not data.startswith("verify-") and not data.startswith("BATCH-") and not "_" in data:
+        # Yeh aapka story unique ID hai (Jaise: fbfe7e70-7)
+        # Isko seedhe payment checkout query (`pay_`) forward karenge!
+        from plugins.payment import confirm_step
+        
+        # Ek fake CallbackQuery trigger object taiyar kar rahe hain pipeline chalane ke liye
+        fake_callback = CallbackQuery(
+            id=str(random.randint(100000, 999999)),
+            from_user=message.from_user,
+            chat_instance="1",
+            message=message,
+            data=f"pay_{data}",
+            client=client
+        )
+        return await confirm_step(client, fake_callback)
+
     try:
         pre, file_id = data.split('_', 1)
     except:
         file_id = data
         pre = ""
+        
     if data.split("-", 1)[0] == "verify":
         userid = data.split("-", 2)[1]
         token = data.split("-", 3)[2]
@@ -114,6 +121,7 @@ async def start(client, message):
                 text="<b>Invalid link or Expired link !</b>",
                 protect_content=True
             )
+            
     elif data.split("-", 1)[0] == "BATCH":
         try:
             if not await check_verification(client, message.from_user.id) and VERIFY_MODE == True:
@@ -130,6 +138,7 @@ async def start(client, message):
                 return
         except Exception as e:
             return await message.reply_text(f"**Error - {e}**")
+            
         sts = await message.reply("**🔺 ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ**")
         file_id = data.split("-", 1)[1]
         msgs = BATCH_FILES.get(file_id)
@@ -172,7 +181,6 @@ async def start(client, message):
                 if STREAM_MODE == True:
                     if info.video or info.document:
                         log_msg = info
-                        fileName = {quote_plus(get_name(log_msg))}
                         stream = f"{URL}watch/{str(log_msg.id)}/{quote_plus(get_name(log_msg))}?hash={get_hash(log_msg)}"
                         download = f"{URL}{str(log_msg.id)}/{quote_plus(get_name(log_msg))}?hash={get_hash(log_msg)}"
                         button = [[
@@ -213,24 +221,21 @@ async def start(client, message):
             await k.edit_text("<b>Your All Files/Videos is successfully deleted!!!</b>")
         return
 
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-
-    pre, decode_file_id = ((base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))).decode("ascii")).split("_", 1)
-    if not await check_verification(client, message.from_user.id) and VERIFY_MODE == True:
-        btn = [[
-            InlineKeyboardButton("Verify", url=await get_token(client, message.from_user.id, f"https://telegram.me/{username}?start="))
-        ],[
-            InlineKeyboardButton("How To Open Link & Verify", url=VERIFY_TUTORIAL)
-        ]]
-        await message.reply_text(
-            text="<b>You are not verified !\nKindly verify to continue !</b>",
-            protect_content=True,
-            reply_markup=InlineKeyboardMarkup(btn)
-        )
-        return
+    # Default fallback for single files mapping
     try:
+        pre, decode_file_id = ((base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))).decode("ascii")).split("_", 1)
+        if not await check_verification(client, message.from_user.id) and VERIFY_MODE == True:
+            btn = [[
+                InlineKeyboardButton("Verify", url=await get_token(client, message.from_user.id, f"https://telegram.me/{username}?start="))
+            ],[
+                InlineKeyboardButton("How To Open Link & Verify", url=VERIFY_TUTORIAL)
+            ]]
+            await message.reply_text(
+                text="<b>You are not verified !\nKindly verify to continue !</b>",
+                protect_content=True,
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
+            return
         msg = await client.get_messages(LOG_CHANNEL, int(decode_file_id))
         if msg.media:
             media = getattr(msg, msg.media.value)
@@ -245,7 +250,6 @@ async def start(client, message):
             if STREAM_MODE == True:
                 if msg.video or msg.document:
                     log_msg = msg
-                    fileName = {quote_plus(get_name(log_msg))}
                     stream = f"{URL}watch/{str(log_msg.id)}/{quote_plus(get_name(log_msg))}?hash={get_hash(log_msg)}"
                     download = f"{URL}{str(log_msg.id)}/{quote_plus(get_name(log_msg))}?hash={get_hash(log_msg)}"
                     button = [[
@@ -271,29 +275,21 @@ async def start(client, message):
         return
     except:
         pass
-        
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+
 
 @Client.on_message(filters.command('api') & filters.private)
 async def shortener_api_handler(client, m: Message):
     user_id = m.from_user.id
     user = await get_user(user_id)
     cmd = m.command
-
     if len(cmd) == 1:
         s = script.SHORTENER_API_MESSAGE.format(base_site=user["base_site"], shortener_api=user["shortener_api"])
         return await m.reply(s)
-
     elif len(cmd) == 2:    
         api = cmd[1].strip()
         await update_user_info(user_id, {"shortener_api": api})
         await m.reply("<b>Shortener API updated successfully to</b> " + api)
 
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
 
 @Client.on_message(filters.command("base_site") & filters.private)
 async def base_site_handler(client, m: Message):
@@ -305,47 +301,31 @@ async def base_site_handler(client, m: Message):
         return await m.reply(text=text, disable_web_page_preview=True)
     elif len(cmd) == 2:
         base_site = cmd[1].strip()
-        if base_site == None:
-            await update_user_info(user_id, {"base_site": base_site})
+        if base_site == "None":
+            await update_user_info(user_id, {"base_site": None})
             return await m.reply("<b>Base Site updated successfully</b>")
-            
         if not domain(base_site):
             return await m.reply(text=text, disable_web_page_preview=True)
         await update_user_info(user_id, {"base_site": base_site})
         await m.reply("<b>Base Site updated successfully</b>")
 
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
 
 @Client.on_callback_query()
 async def cb_handler(client: Client, query: CallbackQuery):
     if query.data == "close_data":
         await query.message.delete()
+        
     elif query.data == "about":
         buttons = [[
             InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        await client.edit_message_media(query.message.chat.id, query.message.id, InputMediaPhoto(random.choice(PICS)))
         reply_markup = InlineKeyboardMarkup(buttons)
         me2 = (await client.get_me()).mention
-        await query.message.edit_text(
-            text=script.ABOUT_TXT.format(me2),
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        )
-
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+        await query.message.edit_text(text=script.ABOUT_TXT.format(me2), reply_markup=reply_markup, parse_mode=enums.ParseMode.HTML)
     
     elif query.data == "start":
-        # 🔥 UPDATED LAYOUT: Callback start me bhi sabsé upar store button add kar diya hai
         buttons = [
             [InlineKeyboardButton("🛍️ ᴏᴘᴇɴ ᴇxᴄʟᴜsɪᴠᴇ sᴛᴏʀᴇ 🛍️", callback_data="open_store")],
             [InlineKeyboardButton('💝 sᴜʙsᴄʀɪʙᴇ ᴍʏ ʏᴏᴜᴛᴜʙᴇ ᴄʜᴀɴɴᴇʟ', url='https://youtube.com/@Tech_VJ')],
@@ -361,74 +341,46 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if CLONE_MODE == True:
             buttons.append([InlineKeyboardButton('🤖 ᴄʀᴇᴀᴛᴇ ʏᴏᴜʀ ᴏᴡɴ ᴄʟᴏɴᴇ ʙᴏᴛ', callback_data='clone')])
         reply_markup = InlineKeyboardMarkup(buttons)
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        await client.edit_message_media(query.message.chat.id, query.message.id, InputMediaPhoto(random.choice(PICS)))
         me2 = (await client.get_me()).mention
-        await query.message.edit_text(
-            text=script.START_TXT.format(query.from_user.mention, me2),
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        )
-
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+        await query.message.edit_text(text=script.START_TXT.format(query.from_user.mention, me2), reply_markup=reply_markup, parse_mode=enums.ParseMode.HTML)
     
     elif query.data == "clone":
         buttons = [[
             InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        await client.edit_message_media(query.message.chat.id, query.message.id, InputMediaPhoto(random.choice(PICS)))
         reply_markup = InlineKeyboardMarkup(buttons)
-        await query.message.edit_text(
-            text=script.CLONE_TXT.format(query.from_user.mention),
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        )          
-
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+        await query.message.edit_text(text=script.CLONE_TXT.format(query.from_user.mention), reply_markup=reply_markup, parse_mode=enums.ParseMode.HTML)          
     
     elif query.data == "help":
         buttons = [[
             InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        await client.edit_message_media(query.message.chat.id, query.message.id, InputMediaPhoto(random.choice(PICS)))
         reply_markup = InlineKeyboardMarkup(buttons)
-        await query.message.edit_text(
-            text=script.HELP_TXT,
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        ) 
+        await query.message.edit_text(text=script.HELP_TXT, reply_markup=reply_markup, parse_mode=enums.ParseMode.HTML) 
+
     elif query.data == "open_store":
         await query.answer()
+        # 🌟 SAFE INTEGRATION BLOCK: Ensures missing modules don't cause silent deletions
         try:
-            await query.message.delete()
-        except:
-            pass
-        from plugins.store_board import get_platform_markup
-        await client.send_message(
-            chat_id=query.message.chat.id,
-            text="🎧 <b>Platform Selection</b>\n\nChoose a platform from the keyboard below:",
-            reply_markup=get_platform_markup(),
-            parse_mode=enums.ParseMode.HTML
-        )
-    
-        
-# Don't Remove Credit Tg - @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+            from plugins.store_board import get_platform_markup
+            markup = get_platform_markup()
+            
+            try:
+                await query.message.delete()
+            except:
+                pass
+                
+            await client.send_message(
+                chat_id=query.message.chat.id,
+                text="🎧 <b>Platform Selection</b>\n\nChoose a platform from the keyboard below:",
+                reply_markup=markup,
+                parse_mode=enums.ParseMode.HTML
+            )
+        except Exception as e:
+            print(f"Store UI Generation Error: {e}")
+            await query.answer("⚠️ Store board file missing or broken! Fix 'plugins/store_board.py'", show_alert=True)
