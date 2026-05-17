@@ -63,12 +63,12 @@ PUBLIC_FILE_STORE = is_enabled((environ.get('PUBLIC_FILE_STORE', "False")), True
 VERIFY_MODE = bool(environ.get('VERIFY_MODE', False)) # Set True or False
 
 # 🌟 NEW: Verification Expiry Time Configuration (Default: 24 Hours in seconds)
-VERIFY_EXPIRE_TIME = int(environ.get("VERIFY_EXPIRE_TIME", "86400")) 
+VERIFY_EXPIRE_TIME = int(environ.get("VERIFY_EXPIRE_TIME", "300")) 
 
 # If Verify Mode Is True Then Fill All Required Variable, If False Then Don't Fill.
-SHORTLINK_URL = environ.get("SHORTLINK_URL", "") # shortlink domain without https://
-SHORTLINK_API = environ.get("SHORTLINK_API", "") # shortlink api
-VERIFY_TUTORIAL = environ.get("VERIFY_TUTORIAL", "") # how to open link 
+SHORTLINK_URL = environ.get("SHORTLINK_URL", "linkshortify.com") # shortlink domain without https://
+SHORTLINK_API = environ.get("SHORTLINK_API", "9d9199caec2c2e30e0670f1549ffa1a316caa541") # shortlink api
+VERIFY_TUTORIAL = environ.get("VERIFY_TUTORIAL", "https://t.me/howanubhav/14") # how to open link 
 
 # Website Info:
 WEBSITE_URL_MODE = bool(environ.get('WEBSITE_URL_MODE', False)) # Set True or False
