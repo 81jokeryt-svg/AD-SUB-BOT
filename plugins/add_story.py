@@ -17,6 +17,7 @@ async def start_add_story(client, message):
     if message.from_user.id != config.ADMIN_ID: 
         return
     
+    # Fresh initialization
     ADMIN_STORY_STATES[message.from_user.id] = {"step": "get_name"}
     
     await message.reply_text(
@@ -37,9 +38,12 @@ async def story_setup_conversation_router(client, message):
     if not state:
         return  # Regular users ko ignore karega
 
-    if message.text and message.text.strip() == "/cancel":
-        ADMIN_STORY_STATES.pop(user_id, None)
-        return await message.reply_text("❌ Setup cancelled.")
+    # CRITICAL FIX: Agar koi command bhejta hai, toh use step inputs ke sath mix nahi karna hai
+    if message.text and message.text.strip().startswith("/"):
+        if message.text.strip() == "/cancel":
+            ADMIN_STORY_STATES.pop(user_id, None)
+            return await message.reply_text("❌ Setup cancelled.")
+        return # Baaki commands (jaise /add_story khud) ko skip karega taaki automatic double execution na ho
 
     current_step = state.get("step")
 
@@ -72,7 +76,7 @@ async def story_setup_conversation_router(client, message):
         state["step"] = "get_final"
         ADMIN_STORY_STATES[user_id] = state
         
-        return await message.reply_text("🤖 <b>ғɪɴᴀʟ ʙᴏᴛ ʟɪɴᴋ:</b>\nPayment ke baad milne wala main link dein:", parse_mode=enums.ParseMode.HTML)
+        return await message.reply_text("🤖 <b>... ғɪɴᴀʟ ʙᴏᴛ ʟɪɴᴋ ...:</b>\nPayment ke baad milne wala main link dein:", parse_mode=enums.ParseMode.HTML)
 
     # STEP C: FINAL PAYLOAD ACCESS LINKS
     elif current_step == "get_final":
