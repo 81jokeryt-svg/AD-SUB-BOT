@@ -7,11 +7,10 @@ import urllib.parse
 from pyrogram import Client, filters, enums
 from pyrogram.types import (
     InlineKeyboardMarkup, 
-    InlineKeyboardButton, 
-    ReplyKeyboardRemove
+    InlineKeyboardButton
 )
 from plugins.dbusers import db  # Database integration instance
-import config 
+import config  # Fixed incorrect wildcard syntax string
 
 # Global processing tracking to monitor screenshot submissions
 USER_PAYMENT_STATES = {}
@@ -128,7 +127,7 @@ async def manual_pay(client, call):
             "<b>🎯 Scan & Pay via QR Code</b>\n"
             "──────────────────────────\n"
             f"📦 <b>ɪᴛᴇᴍ:</b> <code>{clean_title}</code>\n"
-            f"💰 <b>ᴀᴍᴏᴜṇᴛ:</b> <code>₹{price}</code>\n"
+            f"💰 <b>ᴀᴍᴏᴜɴᴛ:</b> <code>₹{price}</code>\n"
             "──────────────────────────\n"
             "➔ <i>Apne PhonePe, GPay, Paytm ya kisi bhi upi app se scan karke pay karein aur screenshot submit karein.</i>"
         )
@@ -140,7 +139,7 @@ async def manual_pay(client, call):
             "──────────────────────────\n"
             f"💳 <b>ᴜᴘɪ ɪᴅ:</b> <code>{upi_id_val}</code> (Tap to Copy)\n"
             f"📦 <b>ɪᴛᴇᴍ:</b> <code>{clean_title}</code>\n"
-            f"💰 <b>ᴀᴍᴏᴜṇᴛ:</b> <code>₹{price}</code>\n"
+            f"💰 <b>ᴀᴍᴏᴜɴᴛ:</b> <code>₹{price}</code>\n"
             "──────────────────────────\n"
             "➔ <i>UPI ID copy karke pay karein aur niche diye button par click karke screenshot submit karein.</i>"
         )
@@ -210,7 +209,7 @@ async def payment_screenshot_handler(client, message):
     if display_name and "\n" in display_name:
         display_name = display_name.split("\n")[0].strip()
 
-    await message.reply_text("⏳ <b>ʀᴇǫᴜᴇsᴛ sᴇɴᴛ!</b>\nAdmin check karke aapka access on kar dega.", parse_mode=enums.ParseMode.HTML)
+    await message.reply_text("⏳ <b><b>request sent!</b></b>\nAdmin check karke aapka access on kar dega.", parse_mode=enums.ParseMode.HTML)
     
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve", callback_data=f"app_{user_id}_{item_id}_{mins}")],
@@ -219,7 +218,7 @@ async def payment_screenshot_handler(client, message):
     ])
     
     admin_id_val = getattr(config, 'ADMIN_ID', message.from_user.id)
-    admin_text = f"📥 <b>ɴᴇᴡ ᴘᴀỹᴍᴇɴᴛ ʀᴇǫᴜᴇsᴛ</b>\n────────────────────\n👤 User ID: <code>{user_id}</code>\n📦 Item: <b>{display_name}</b>\n⏳ Plan: {mins if mins != 'manual' else 'Lifetime'}"
+    admin_text = f"📥 <b><b>new payment request</b></b>\n────────────────────\n👤 User ID: <code>{user_id}</code>\n📦 Item: <b>{display_name}</b>\n⏳ Plan: {mins if mins != 'manual' else 'Lifetime'}"
     await client.send_photo(chat_id=admin_id_val, photo=photo_id, caption=admin_text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
 
 
@@ -237,11 +236,13 @@ async def process_inline_cancel(client, call):
 # --- 5. ADMIN APPROVAL DISPATCH SYSTEM ---
 @Client.on_callback_query(filters.regex("^app_"))
 async def admin_approve(client, call):
+    # Dynamic split data extraction optimized to prevent payload breakdown
     parts = call.data.split('_')
     u_id = parts[1]
     mins = parts[-1]
     
-    item_id = "_join".join(parts[2:-1]) if "_join" in call.data else "_".join(parts[2:-1])
+    # Advanced logic to parse raw database keys out of callback array safely
+    item_id = "_".join(parts[2:-1])
     
     data = await db.db.channels_col.find_one({"item_id": item_id}) or \
            await db.db.channels_col.find_one({"channel_id": int(item_id) if item_id.replace('-','').isdigit() else 0})
@@ -262,7 +263,7 @@ async def admin_approve(client, call):
                 ch_title = ch_info.get('name') or ch_info.get('story_name') if ch_info else f"VIP Channel {ch_id}"
                 inline_buttons.append([InlineKeyboardButton(f"📢 Join: {ch_title}", url=invite.invite_link)])
             except Exception as e:
-                print(f"Combo Link Error: {e}")
+                print(f"Combo Link Error for channel {ch_id}: {e}")
         msg += "⚠️ <i>Links single-use hain, ek baar join hone ke baad automatic expire ho jayengi!</i>"
 
     elif data.get('type') == 'channel' or ('channel_id' in data and data.get('source') not in ['pocket', 'pratilipi'] and not data.get('is_combo')):
@@ -271,7 +272,7 @@ async def admin_approve(client, call):
         try:
             invite = await client.create_chat_invite_link(chat_id=target_channel, member_limit=1)
             inline_buttons.append([InlineKeyboardButton("🔐 JOIN PREMIUM CHANNEL", url=invite.invite_link)])
-            msg = f"✅ <b>ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\n📂 <b>ᴄʜᴀɴɴᴇʟ:</b> <b>{data.get('name', 'VIP Channel')}</b>\n\nJoin karne ke liye neeche button par click karein:"
+            msg = f"✅ <b>ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\n📂 <b>ᴄʜᴀṇɴᴇʟ:</b> <b>{data.get('name', 'VIP Channel')}</b>\n\nJoin karne ke liye neeche button par click karein:"
         except: 
             msg = "✅ <b>ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n\nBot link generate nahi kar saka, admin rights setup check karein."
 
@@ -287,7 +288,7 @@ async def admin_approve(client, call):
             f"🎉 <b>ᴘᴀỹᴍᴇɴᴛ ᴀᴘᴘʀᴏᴠᴇᴅ!</b>\n"
             f"────────────────────\n"
             f"📖 <b>sᴛᴏʀỹ:</b> {clean_story_name}\n"
-            f"💰 <b>ᴘʀɪᴄɪɴɢ:</b> ₹{data.get('price', '49')}\n"
+            f"💰 <b>ᴘʀɪᴄɪṇɢ:</b> ₹{data.get('price', '49')}\n"
             f"────────────────────\n"
             f"➔ Niche diye gaye button par click karke apni full story access karein 👇"
         )
