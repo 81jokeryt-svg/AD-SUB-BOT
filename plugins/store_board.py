@@ -16,9 +16,9 @@ from plugins.dbusers import db
 # User states pagination track karne ke liye
 USER_STORE_STATES = {}
 
-# ─── 1. BOTTOM KEYBOARD CATEGORIES MENU (KUKU REMOVED) ───
-def get_categories_markup():
-    """User ko niche reply keyboard me platforms dikhane ke liye"""
+# ─── 1. BOTTOM KEYBOARD CATEGORIES MENU (CONNECTED WITH START.PY) ───
+def get_platform_markup():
+    """Start.py se coordinate karne ke liye main categories filter selection grid"""
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton("Pratilipi FM"), KeyboardButton("Pocket FM")],
@@ -27,6 +27,10 @@ def get_categories_markup():
         ],
         resize_keyboard=True
     )
+
+def get_categories_markup():
+    """Fallback validation name handling"""
+    return get_platform_markup()
 
 
 # ─── 2. PAGINATED ITEMS MENU ENGINE (PRATILIPI + POCKET + COMBO) ───
@@ -111,10 +115,10 @@ async def store_board_central_router(client, message):
         USER_STORE_STATES[user_id] = {"category": "home", "page": 1}
         return await message.reply_text(
             "🎧 <b>Platform Selection</b>\n\nChoose a platform from the keyboard below:", 
-            reply_markup=get_categories_markup()
+            reply_markup=get_platform_markup()
         )
 
-    # State Categories router map (Kuku replaced with Pratilipi)
+    # State Categories router map
     category_map = {
         "Pratilipi FM": ("pratilipi", "✨ <b>ᴘʀᴀᴛɪʟɪᴘɪ ғᴍ sᴛᴏʀɪᴇs</b>"),
         "Pocket FM": ("pocket", "🎧 <b>ᴘᴏᴄᴋᴇᴛ ғᴍ sᴛᴏʀɪᴇs</b>"),
@@ -171,7 +175,7 @@ async def store_board_central_router(client, message):
         loading_alert = await message.reply_text(
             "⏳ <i>Loading Story Details...</i>", 
             reply_markup=ReplyKeyboardRemove(), 
-            parse_mode="html"
+            parse_mode=enums.ParseMode.HTML
         )
 
         inline_markup = []
@@ -186,7 +190,7 @@ async def store_board_central_router(client, message):
             inline_markup.append([InlineKeyboardButton(f"💳 UNLOCK PREMIUM STORY - ₹{data.get('price', '49')}", callback_data=f"pay_{db_id}")])
             header = f"🔥 <b>ᴘʀᴇᴍɪᴜᴍ ᴇxᴄʟᴜsɪᴠᴇ sᴛᴏʀʏ ({data.get('source', 'audio')})</b>"
             item_label = data.get('story_name').split("\n")[0].strip() # First line split check
-            desc_text = "🤖 <b>**ᴅᴇʟɪᴠᴇʀʏ:**</b> <code><b>ɪɴsᴛᴀɴᴛ ʙᴏᴛ ʟɪɴᴋ ᴀᴄᴄᴇss</b></code>"
+            desc_text = "🤖 <b>ᴅᴇʟɪᴠᴇʀʏ:</b> <code><b>ɪɴsᴛᴀɴᴛ ʙᴏᴛ ʟɪɴᴋ ᴀᴄᴄᴇss</b></code>"
 
         if data.get('demo_link'):
             inline_markup.append([InlineKeyboardButton("📺 ᴠɪᴇᴡ ǫᴜᴀʟɪᴛʏ ᴅᴇᴍᴏ", url=data['demo_link'])])
