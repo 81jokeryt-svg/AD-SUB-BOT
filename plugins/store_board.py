@@ -3,7 +3,7 @@
 # Ask Doubt on telegram @KingVJ01
 
 import re
-from pyrogram import Client, filters, enums  # Added enums import strictly here
+from pyrogram import Client, filters, enums
 from pyrogram.types import (
     ReplyKeyboardMarkup, 
     KeyboardButton, 
@@ -39,7 +39,6 @@ async def get_store_pagination_markup(category_type, page=1):
     limit = 8
     skip = (page - 1) * limit
     
-    # Kuku filter dropped -> Pratilipi filter assigned dynamically
     if category_type == "pratilipi":
         query = {"story_name": {"$exists": True}, "source": "pratilipi", "is_combo": {"$exists": False}}
     elif category_type == "pocket":
@@ -192,7 +191,7 @@ async def store_board_central_router(client, message):
             if not data:
                 return await message.reply_text("❌ <i>Story Details nahi mil saki. Kripya list se sahi select karein.</i>")
 
-        # Visual cleanup alert
+        #Visual cleanup alert
         loading_alert = await message.reply_text(
             "⏳ <i>Loading Story Details...</i>", 
             reply_markup=ReplyKeyboardRemove(), 
@@ -208,7 +207,7 @@ async def store_board_central_router(client, message):
             item_label = data.get('combo_name')
             desc_text = f"📝 <b>ɪɴᴄʟᴜᴅᴇᴅ sᴛᴏʀɪᴇs:</b>\n<i>{data.get('description', 'All premium files included.')}</i>"
         else:
-            inline_markup.append([InlineKeyboardButton(f"💳 UNLOCK PREMIUM STORY - ₹{data.get('price', '49')}", callback_data=f"pay_{db_id}")])
+            inline_markup.append([InlineKeyboardButton(f"🔓 UNLOCK PREMIUM STORY - ₹{data.get('price', '12')}", callback_data=f"pay_{db_id}")])
             header = f"🔥 <b><b>ᴘʀᴇᴍɪᴜᴍ ᴇxᴄʟᴜsɪᴠᴇ sᴛᴏʀʏ</b> ({data.get('source', 'audio').upper()})</b>"
             
             raw_lbl = data.get('story_name') or data.get('name') or 'Premium Story'
@@ -220,7 +219,7 @@ async def store_board_central_router(client, message):
             
         inline_markup.append([InlineKeyboardButton("⬅️ BACK TO LIST", callback_data="back_to_store_list")])
 
-        details_layout = f"{header}\n──────────────────────────\n📦 <b><u>ɪᴛᴇᴍ:</u></b> <code>{item_label}</code>\n💰 <b><u>ᴘʀɪᴄᴇ:</u></b> <b>₹{data.get('price', '49')}</b>\n\n{desc_text}\n──────────────────────────"
+        details_layout = f"{header}\n──────────────────────────\n📦 <b><u>ɪᴛᴇᴍ:</u></b> <code>{item_label}</code>\n💰 <b><u>ᴘʀɪᴄᴇ:</u></b> <b>₹{data.get('price', '12')}</b>\n\n{desc_text}\n──────────────────────────"
         photo_id = data.get('file_id')
 
         try:
@@ -239,16 +238,83 @@ async def store_board_central_router(client, message):
 async def process_return_store_callback(client, call):
     user_id = call.from_user.id
     await call.answer()
+    
+    # SMART DELETE: Cheks if active message contains photo structure before deletion
     try:
-        await call.message.delete()
-    except:
-        pass
+        # Cheks if message contains active media (photo map)
+        if call.message.photo:
+            # Pure standard photo structure must be deleted strictly on list returns
+            await call.message.delete()
+        else:
+            # Standard text messages can be gracefully morphed safely
+            await call.message.edit_text("👇 <i>List se select karein:</i>", reply_markup=None)
+    except Exception:
+        # Fallback if standard methods are rejected
+        try: await call.message.delete()
+        except: pass
         
     state = USER_STORE_STATES.get(user_id, {"category": "pocket", "page": 1})
     markup_keyboard = await get_store_pagination_markup(state["category"], page=state["page"])
     
+    # Strictly send dynamic new message after old one is flushed
     await client.send_message(
         chat_id=call.message.chat.id, 
         text="👇 <i>Apni pasand ka item select karke full access lein:</i>", 
         reply_markup=markup_keyboard
+    )
+
+
+# ─── 5. FIXED: UNLOCK BUTTON PAY CALLBACK HANDLER (DELETE THEN SEND FLOW) ───
+@Client.on_callback_query(filters.regex("^pay_"))
+async def process_payment_gateway_routing(client, call):
+    """Triggers strictly on intermediate confirm intermediate intermediates, applying delete-then-send layout"""
+    await call.answer()
+    story_id = call.data.split("_", 1)[1]
+    
+    # DB se accurate item details recover karein
+    data = await db.find_single_story({
+        "$or": [
+            {"item_id": story_id},
+            {"channel_id": story_id},
+            {"_id": story_id}
+        ]
+    })
+    
+    if not data:
+        data = await db.find_single_story({"combo_name": story_id})
+        
+    price = data.get('price', '12') if data else '12'
+    title = data.get('combo_name') or (data.get('story_name') or data.get('name', 'Premium Item')).split("\n")[0].strip()
+
+    # Buttons layout strictly lowercase
+    payment_keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📸 PAY VIA QR SCAN", callback_data=f"qr_{story_id}")],
+        [InlineKeyboardButton("💳 PAY VIA UPI ID", callback_data=f"upi_{story_id}")],
+        [InlineKeyboardButton("❌ CANCEL PAYMENT", callback_data="back_to_store_list")]
+    ])
+    
+    payment_layout = (
+        "⚙️ <b><u>ᴄᴏɴғɪʀᴍ sᴇʟᴇᴄᴛɪᴏɴ</u></b>\n"
+        "──────────────────────────\n"
+        f"📦 <b>ɪᴛᴇᴍ:</b> <code>{title}</code>\n"
+        f"💰 <b>ᴀᴍᴏᴜɴᴛ:</b> <code>₹{price}</code>\n\n"
+        "➔ <b>ᴘᴀỹᴍᴇɴᴛ ᴍᴇᴛʜᴏᴅ sᴇʟᴇᴄᴛ ᴋᴀʀᴇɪɴ:</b>\n"
+        "──────────────────────────"
+    )
+    
+    # CRITICAL CHANGE: The intermediate story details card must be strictly deleted before sending pay intermediate layout
+    try:
+        # Async Motor based document deletion reference check to flush photo safely
+        await call.message.delete()
+    except Exception as e:
+        # Safe Side fallback for standard text edit
+        try:
+            await call.message.edit_reply_markup(reply_markup=None) # Clean intermediate state pointers safely
+        except: pass
+
+    # Strictly sends unified dynamic new pay intermediate checks block
+    await client.send_message(
+        chat_id=call.message.chat.id,
+        text=payment_layout,
+        reply_markup=payment_keyboard
     )
