@@ -413,7 +413,21 @@ async def cb_handler(client: Client, query: CallbackQuery):
             text=script.HELP_TXT,
             reply_markup=reply_markup,
             parse_mode=enums.ParseMode.HTML
-        )  
+        ) 
+    elif query.data == "open_store":
+        await query.answer()
+        try:
+            await query.message.delete()
+        except:
+            pass
+        from plugins.store_board import get_platform_markup
+        await client.send_message(
+            chat_id=query.message.chat.id,
+            text="🎧 <b>Platform Selection</b>\n\nChoose a platform from the keyboard below:",
+            reply_markup=get_platform_markup(),
+            parse_mode=enums.ParseMode.HTML
+        )
+    
         
 # Don't Remove Credit Tg - @VJ_Bots
 # Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
