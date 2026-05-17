@@ -11,7 +11,7 @@ from pyrogram.types import (
     ReplyKeyboardRemove
 )
 from plugins.dbusers import db  # Database integration instance
-import config
+import config *
 
 # Global processing tracking to monitor screenshot submissions
 USER_PAYMENT_STATES = {}
@@ -108,7 +108,8 @@ async def manual_pay(client, call):
     display_name = data.get('combo_name') or data.get('story_name') or data.get('name', 'Premium Item')
     clean_title = display_name.split("\n")[0].strip()
         
-    upi_string = f"upi://pay?pa={config.UPI_ID}&pn=Premium%20Store&am={price}&cu=INR&tn=Pay_{db_id}"
+    upi_id_val = getattr(config, 'UPI_ID', 'heyjeetx@naviaxis')
+    upi_string = f"upi://pay?pa={upi_id_val}&pn=Premium%20Store&am={price}&cu=INR&tn=Pay_{db_id}"
     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=350x350&data={urllib.parse.quote(upi_string)}"
     
     markup = InlineKeyboardMarkup([
@@ -127,7 +128,7 @@ async def manual_pay(client, call):
             "<b>🎯 Scan & Pay via QR Code</b>\n"
             "──────────────────────────\n"
             f"📦 <b>ɪᴛᴇᴍ:</b> <code>{clean_title}</code>\n"
-            f"💰 <b>ᴀᴍᴏᴜɴᴛ:</b> <code>₹{price}</code>\n"
+            f"💰 <b>ᴀᴍᴏᴜṇᴛ:</b> <code>₹{price}</code>\n"
             "──────────────────────────\n"
             "➔ <i>Apne PhonePe, GPay, Paytm ya kisi bhi upi app se scan karke pay karein aur screenshot submit karein.</i>"
         )
@@ -137,9 +138,9 @@ async def manual_pay(client, call):
             "📲 <b><u>[ ᴄᴏᴍᴘʟᴇᴛᴇ ᴘᴀỹᴍᴇɴᴛ ]</u></b>\n\n"
             "<b>🎯 Copy UPI ID & Pay Manual</b>\n"
             "──────────────────────────\n"
-            f"💳 <b>ᴜᴘɪ ɪᴅ:</b> <code>{config.UPI_ID}</code> (Tap to Copy)\n"
+            f"💳 <b>ᴜᴘɪ ɪᴅ:</b> <code>{upi_id_val}</code> (Tap to Copy)\n"
             f"📦 <b>ɪᴛᴇᴍ:</b> <code>{clean_title}</code>\n"
-            f"💰 <b>ᴀᴍᴏᴜɴᴛ:</b> <code>₹{price}</code>\n"
+            f"💰 <b>ᴀᴍᴏᴜṇᴛ:</b> <code>₹{price}</code>\n"
             "──────────────────────────\n"
             "➔ <i>UPI ID copy karke pay karein aur niche diye button par click karke screenshot submit karein.</i>"
         )
@@ -209,7 +210,7 @@ async def payment_screenshot_handler(client, message):
     if display_name and "\n" in display_name:
         display_name = display_name.split("\n")[0].strip()
 
-    await message.reply_text("⏳ <b><b>ʀᴇǫᴜᴇsᴛ sᴇɴᴛ!</b></b>\nAdmin check karke aapka access on kar dega.", parse_mode=enums.ParseMode.HTML)
+    await message.reply_text("⏳ <b>ʀᴇǫᴜᴇsᴛ sᴇɴᴛ!</b>\nAdmin check karke aapka access on kar dega.", parse_mode=enums.ParseMode.HTML)
     
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Approve", callback_data=f"app_{user_id}_{item_id}_{mins}")],
@@ -217,8 +218,9 @@ async def payment_screenshot_handler(client, message):
          InlineKeyboardButton("💬 Support", url=f"tg://openmessage?user_id={user_id}")]
     ])
     
-    admin_text = f"📥 <b><b>ɴᴇᴡ ᴘᴀỹᴍᴇɴᴛ ʀᴇǫᴜᴇsᴛ</b></b>\n────────────────────\n👤 User ID: <code>{user_id}</code>\n📦 Item: <b>{display_name}</b>\n⏳ Plan: {mins if mins != 'manual' else 'Lifetime'}"
-    await client.send_photo(chat_id=config.ADMIN_ID, photo=photo_id, caption=admin_text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
+    admin_id_val = getattr(config, 'ADMIN_ID', message.from_user.id)
+    admin_text = f"📥 <b>ɴᴇᴡ ᴘᴀỹᴍᴇɴᴛ ʀᴇǫᴜᴇsᴛ</b>\n────────────────────\n👤 User ID: <code>{user_id}</code>\n📦 Item: <b>{display_name}</b>\n⏳ Plan: {mins if mins != 'manual' else 'Lifetime'}"
+    await client.send_photo(chat_id=admin_id_val, photo=photo_id, caption=admin_text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
 
 
 @Client.on_callback_query(filters.regex("^cancel_payment$"))
