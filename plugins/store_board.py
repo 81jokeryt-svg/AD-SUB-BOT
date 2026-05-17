@@ -9,7 +9,8 @@ from pyrogram.types import (
     KeyboardButton, 
     InlineKeyboardMarkup, 
     InlineKeyboardButton, 
-    ReplyKeyboardRemove
+    ReplyKeyboardRemove,
+    CallbackQuery
 )
 from plugins.dbusers import db
 
@@ -86,6 +87,8 @@ async def get_store_pagination_markup(category_type, page=1):
 async def show_story_details_by_id(client, chat_id, data):
     """Deep link ya keyboard click dono par pehle Premium Details aur CONFIRM button dikhane ke liye"""
     inline_markup = []
+    
+    # Mongo DB documents me se proper string format ID nikalna
     db_id = str(data.get('item_id') or data.get('channel_id') or data.get('_id'))
 
     if data.get('is_combo'):
@@ -99,7 +102,7 @@ async def show_story_details_by_id(client, chat_id, data):
         item_label = raw_lbl.split("\n")[0].strip()
         desc_text = f"📝 <b>sᴛᴏʀỹ ᴅᴇsᴄʀɪᴘᴛɪᴏɴ:</b>\n<i>{data.get('description', 'All chapters included instantly.')}</i>"
 
-    # ✅ Single standard button click karne par payment.py ka checkout summary active hoga
+    # Sahi pattern me callback register karna taaki direct click ho sake
     inline_markup.append([InlineKeyboardButton("✅ CONFIRM", callback_data=f"pay_{db_id}")])
     
     if data.get('demo_link'):
@@ -111,7 +114,7 @@ async def show_story_details_by_id(client, chat_id, data):
         f"{header}\n"
         "──────────────────────────\n"
         f"📦 <b>sᴛᴏʀỹ:</b> <code>{item_label}</code>\n"
-        f"📊 <b>sᴛᴀᴛᴜs:</b> <code>ᴄᴏᴍᴘʟᴇᴛᴇᴅ</code>\n"
+        f"📊 <b>sᴛᴀᴛᴜs:</b> <code><b>ᴄᴏᴍᴘʟᴇᴛᴇᴅ</b></code>\n"
         f"💰 <b>ᴘʀɪᴄᴇ:</b> <b>₹{data.get('price', '12')}</b>\n"
         f"🤖 <b>ᴅᴇʟɪᴠᴇʀỹ:</b> <code>ɪɴsᴛᴀɴᴛ ʙᴏᴛ ʟɪɴᴋ ᴀᴄᴄᴇss</code>\n"
         "──────────────────────────\n"
@@ -218,7 +221,7 @@ async def store_board_central_router(client, message):
         await show_story_details_by_id(client, message.chat.id, data)
 
 
-# ─── 5. BACK TO LIST INLINE CALLBACK CONTROLLER ───
+# ─── 5. FIXED BACK TO LIST CALLBACK ───
 @Client.on_callback_query(filters.regex("^back_to_store_list$"))
 async def process_return_store_callback(client, call):
     user_id = call.from_user.id
