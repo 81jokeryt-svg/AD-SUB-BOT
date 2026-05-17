@@ -273,7 +273,7 @@ async def admin_approve(client, call):
             f"💰 <b><b>ᴘʀɪᴄᴇ:</b></b> ₹{data.get('price', '49')}\n"
             f"────────────────────\n"
             f"➔ Niche diye gaye button par click karke apni full story access karein 👇"
-        )
+            )
 
     try:
         markup = InlineKeyboardMarkup(inline_buttons)
