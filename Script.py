@@ -153,6 +153,7 @@ KINDLY VERIFY TO CONTINUE & YOU CAN GET UNLIMITED ACCESS FOR 1 HOURS ✅
 🔥 <i>अगर आप VERIFY नहीं करना चाहते तो आप PREMIUM ले सकते हो, PREMIUM लेने के बाद आप UNLIMITED MOVIES प्राप्त कर पाओगे और आपको VERIFY करने की कोई जरूरत नहीं है।</i>
 
 <b>PLAN DETAILS के लिए CLICK करें 👉 /plan</b>"""
+    VERIFIED_SUCCESS_TEXT = "<b>Hey {}, You are successfully verified !\nNow you have unlimited access for all files till your verification validity period.</b>"
 
     PREMIUM_PLAN_TEXT = """👑 <b>PREMIUM SUBSCRIPTION PLAN</b>
 ──────────────────────────────
