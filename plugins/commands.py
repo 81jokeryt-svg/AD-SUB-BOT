@@ -43,12 +43,18 @@ def formate_file_name(file_name):
     file_name = '@VJ_Botz ' + ' '.join(filter(lambda x: not x.startswith('http') and not x.startswith('@') and not x.startswith('www.'), file_name.split()))
     return file_name
 
+
+# ==========================================
+#            📡 HANDLERS PIPELINE
+# ==========================================
+
 @Client.on_message(filters.command("start") & filters.incoming)
 async def start(client, message):
     username = client.me.username
-    if not await db.is_user_exist(message.from_user.id):
-        await db.add_user(message.from_user.id, message.from_user.first_name)
-        await client.send_message(LOG_CHANNEL, script.LOG_TEXT.format(message.from_user.id, message.from_user.mention))
+    user_id = message.from_user.id
+    if not await db.is_user_exist(user_id):
+        await db.add_user(user_id, message.from_user.first_name)
+        await client.send_message(LOG_CHANNEL, script.LOG_TEXT.format(user_id, message.from_user.mention))
     
     if len(message.command) != 2:
         buttons = [[
@@ -77,13 +83,13 @@ async def start(client, message):
     if data.split("-", 1)[0] == "verify":
         userid = data.split("-", 2)[1]
         token = data.split("-", 3)[2]
-        if str(message.from_user.id) != str(userid):
+        if str(user_id) != str(userid):
             return await message.reply_text(text="<b>Invalid link or Expired link !</b>", protect_content=True)
         is_valid = await check_token(client, userid, token)
         if is_valid == True:
-            # 🌟 UPDATED: Midnight text ko hata kar hourly basis access dynamic message set kar diya hai
+            # 🌟 UPDATED: Ab verified text direct Script.py se utha kar user mention format karega
             await message.reply_text(
-                text=f"<b>Hey {message.from_user.mention}, You are successfully verified !\nNow you have unlimited access for all files till your verification validity period.</b>",
+                text=script.VERIFIED_SUCCESS_TEXT.format(message.from_user.mention),
                 protect_content=True
             )
             await verify_user(client, userid, token)
@@ -94,16 +100,16 @@ async def start(client, message):
     # 2. HANDLE BATCH LINKS
     elif data.split("-", 1)[0] == "BATCH":
         try:
-            if not await check_verification(client, message.from_user.id) and VERIFY_MODE == True:
-                btn = [[
-                    InlineKeyboardButton("Verify", url=await get_token(client, message.from_user.id, f"https://telegram.me/{username}?start="))
-                ],[
-                    InlineKeyboardButton("How To Open Link & Verify", url=VERIFY_TUTORIAL)
-                ]]
+            if not await check_verification(client, user_id) and VERIFY_MODE == True:
+                not_verified_buttons = [
+                    [InlineKeyboardButton("🚀 CLICK HERE TO VERIFY", url=await get_token(client, user_id, f"https://telegram.me/{username}?start="))],
+                    [InlineKeyboardButton("👑 BUY PREMIUM / PLANS", callback_data="open_premium_plans")],
+                    [InlineKeyboardButton("❓ HOW TO VERIFY", url=VERIFY_TUTORIAL)]
+                ]
                 await message.reply_text(
-                    text="<b>You are not verified !\nKindly verify to continue !</b>",
+                    text=script.NOT_VERIFIED_TEXT,
                     protect_content=True,
-                    reply_markup=InlineKeyboardMarkup(btn)
+                    reply_markup=InlineKeyboardMarkup(not_verified_buttons)
                 )
                 return
         except Exception as e:
@@ -203,16 +209,16 @@ async def start(client, message):
         return
 
     # 3. HANDLE SINGLE FILE / PHOTO LINKS
-    if not await check_verification(client, message.from_user.id) and VERIFY_MODE == True:
-        btn = [[
-            InlineKeyboardButton("Verify", url=await get_token(client, message.from_user.id, f"https://telegram.me/{username}?start="))
-        ],[
-            InlineKeyboardButton("How To Open Link & Verify", url=VERIFY_TUTORIAL)
-        ]]
+    if not await check_verification(client, user_id) and VERIFY_MODE == True:
+        not_verified_buttons = [
+            [InlineKeyboardButton("🚀 CLICK HERE TO VERIFY", url=await get_token(client, user_id, f"https://telegram.me/{username}?start="))],
+            [InlineKeyboardButton("👑 BUY PREMIUM / PLANS", callback_data="open_premium_plans")],
+            [InlineKeyboardButton("❓ HOW TO VERIFY", url=VERIFY_TUTORIAL)]
+        ]
         await message.reply_text(
-            text="<b>You are not verified !\nKindly verify to continue !</b>",
+            text=script.NOT_VERIFIED_TEXT,
             protect_content=True,
-            reply_markup=InlineKeyboardMarkup(btn)
+            reply_markup=InlineKeyboardMarkup(not_verified_buttons)
         )
         return
 
@@ -271,6 +277,24 @@ async def start(client, message):
         logger.error(f"Error in single file delivery: {str(e)}")
         pass
 
+# ─── DIRECT /plan COMMAND HANDLER ───
+@Client.on_message(filters.command(['plan']) & filters.private)
+async def premium_plan_cmd(bot, message):
+    plan_buttons = [
+        [
+            InlineKeyboardButton("📸 Qr", callback_data="pay_via_qr"),
+            InlineKeyboardButton("💳 Upi", callback_data="pay_via_upi")
+        ],
+        [
+            InlineKeyboardButton("{ CLOSE }", callback_data="close_data")
+        ]
+    ]
+    await message.reply_text(
+        text=script.PREMIUM_PLAN_TEXT,
+        protect_content=True,
+        reply_markup=InlineKeyboardMarkup(plan_buttons)
+    )
+
 @Client.on_message(filters.command('api') & filters.private)
 async def shortener_api_handler(client, m: Message):
     user_id = m.from_user.id
@@ -305,13 +329,65 @@ async def base_site_handler(client, m: Message):
         await update_user_info(user_id, {"base_site": base_site})
         await m.reply("<b>Base Site updated successfully</b>")
 
+
+# ==========================================
+#         📡 CALLBACKS EXECUTION HUB
+# ==========================================
+
 @Client.on_callback_query()
 async def cb_handler(client: Client, query: CallbackQuery):
-    if query.data == "close_data":
+    
+    # 🌟 CALLBACK: "BUY PREMIUM" BUTTON CLICK FROM NOT VERIFIED BOX
+    if query.data == "open_premium_plans":
+        await query.answer("Opening Premium Plans... 📥")
+        plan_buttons = [
+            [
+                InlineKeyboardButton("📸 Qr", callback_data="pay_via_qr"),
+                InlineKeyboardButton("💳 Upi", callback_data="pay_via_upi")
+            ],
+            [
+                InlineKeyboardButton("{ CLOSE }", callback_data="close_data")
+            ]
+        ]
+        await query.message.reply_text(
+            text=script.PREMIUM_PLAN_TEXT,
+            protect_content=True,
+            reply_markup=InlineKeyboardMarkup(plan_buttons)
+        )
+        
+    # 🌟 CALLBACK: QR SELECTION LAYER (Naya Photo Drop reply)
+    elif query.data == "pay_via_qr":
+        await query.answer("Loading QR Code... 🖼️")
+        qr_buttons = [
+            [InlineKeyboardButton("📤 SEND PAYMENT SCREENSHOT", url="https://t.me/KingVJ01")],
+            [InlineKeyboardButton("{ CLOSE }", callback_data="close_data")]
+        ]
+        await query.message.reply_photo(
+            photo="https://graph.org/file/e6162a74c6d67b2fc809d.jpg", 
+            caption=script.QR_REPLY_TEXT,
+            reply_markup=InlineKeyboardMarkup(qr_buttons)
+        )
+        
+    # 🌟 CALLBACK: UPI SELECTION LAYER (Naya text Drop reply)
+    elif query.data == "pay_via_upi":
+        await query.answer("Loading UPI Details... 💳")
+        upi_buttons = [
+            [InlineKeyboardButton("📤 SEND PAYMENT SCREENSHOT", url="https://t.me/KingVJ01")],
+            [InlineKeyboardButton("{ CLOSE }", callback_data="close_data")]
+        ]
+        await query.message.reply_text(
+            text=script.UPI_REPLY_TEXT,
+            protect_content=True,
+            reply_markup=InlineKeyboardMarkup(upi_buttons)
+        )
+
+    elif query.data == "close_data":
+        await query.answer("Closed ❌")
         await query.message.delete()
+        
     elif query.data == "about":
         buttons = [[
-            InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
+            InlineKeyboardButton('Hᴏᴍｅ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
         await client.edit_message_media(
@@ -331,7 +407,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         buttons = [[
             InlineKeyboardButton('💝 sᴜʙsᴄʀɪʙᴇ ᴍʏ ʏᴏᴜᴛᴜʙᴇ ᴄʜᴀɴɴᴇʟ', url='https://youtube.com/@Tech_VJ')
         ],[
-            InlineKeyboardButton('🔍 sᴜᴘᴘᴏʀ陶 ɢʀᴏᴜᴘ', url='https://t.me/vj_bot_disscussion'),
+            InlineKeyboardButton('🔍 sᴜᴘᴘᴏʀᴛ ɢʀᴏᴜᴘ', url='https://t.me/vj_bot_disscussion'),
             InlineKeyboardButton('🤖 ᴜᴘᴅᴀᴛᴇ ᴄʜᴀɴɴᴇʟ', url='https://t.me/vj_bots')
         ],[
             InlineKeyboardButton('💁‍♀️ ʜᴇʟᴘ', callback_data='help'),
@@ -385,5 +461,3 @@ async def cb_handler(client: Client, query: CallbackQuery):
             reply_markup=reply_markup,
             parse_mode=enums.ParseMode.HTML
         )
-
-# commands.py
