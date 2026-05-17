@@ -80,10 +80,8 @@ async def start(client, message):
     
     # --- 🎯 FIXED UNIFIED FLOW INTERCEPTOR ---
     if not data.startswith("verify-") and not data.startswith("BATCH-") and not "_" in data:
-        # Yeh aapka unique id hai jo direct channel post se link hokar aaya hai
         from plugins.store_board import show_story_details_by_id
         
-        # Aapki core structure ke hisab se channels_col collection me ID search karenge
         story_data = await db.db.channels_col.find_one({"item_id": data}) or \
                      await db.db.channels_col.find_one({"channel_id": int(data) if data.replace('-','').isdigit() else 0})
         
@@ -91,7 +89,6 @@ async def start(client, message):
             story_data = await db.db.channels_col.find_one({"combo_name": data})
 
         if story_data:
-            # 🚀 USER KO DIRECT DETAIL PAGE PAR BHEJO (WITH ✅ CONFIRM BUTTON)
             return await show_story_details_by_id(client, message.chat.id, story_data)
         else:
             return await message.reply_text("❌ <b>Story Details nahi mil saki ya link delete ho gayi hai!</b>")
@@ -311,8 +308,34 @@ async def base_site_handler(client, m: Message):
         await m.reply("<b>Base Site updated successfully</b>")
 
 
+# ─── 🎯 CENTRAL SYSTEM CALLBACK HANDLER ───
 @Client.on_callback_query()
 async def cb_handler(client: Client, query: CallbackQuery):
+    user_id = query.from_user.id
+
+    # 🟢 1. HANDLE CONFIRM BUTTON CLICKS (Forward to payment.py)
+    if query.data.startswith("pay_"):
+        await query.answer("🔄 Processing Gateway...")
+        from plugins.payment import confirm_step
+        return await confirm_step(client, query)
+
+    # 🔵 2. HANDLE BACK BUTTON CLICKS (Return back to stories keyboard list)
+    if query.data == "back_to_store_list":
+        await query.answer("🔙 Going Back...")
+        try:
+            await query.message.delete()
+        except:
+            pass
+        from plugins.store_board import USER_STORE_STATES, get_store_pagination_markup
+        state = USER_STORE_STATES.get(user_id, {"category": "pocket", "page": 1})
+        markup_keyboard = await get_store_pagination_markup(state["category"], page=state["page"])
+        return await client.send_message(
+            chat_id=query.message.chat.id, 
+            text="👇 <i>Apni pasand ka item select karke full access lein:</i>", 
+            reply_markup=markup_keyboard
+        )
+
+    # 🟡 3. BASE KEYBOARD FUNCTIONS
     if query.data == "close_data":
         await query.message.delete()
         
@@ -340,7 +363,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
             ]
         ]
         if CLONE_MODE == True:
-            buttons.append([InlineKeyboardButton('🤖 ᴄʀᴇᴀᴛᴇ ʏᴏᴜʀ ᴏᴡɴ ᴄʟᴏɴᴇ ʙᴏᴛ', callback_data='clone')])
+            buttons.append([InlineKeyboardButton('🤖 ᴄʀᴇᴀãᴛᴇ ʏᴏᴜʀ ᴏᴡɴ ᴄʟᴏɴᴇ ʙᴏᴛ', callback_data='clone')])
         reply_markup = InlineKeyboardMarkup(buttons)
         await client.edit_message_media(query.message.chat.id, query.message.id, InputMediaPhoto(random.choice(PICS)))
         me2 = (await client.get_me()).mention
