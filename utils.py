@@ -1,7 +1,3 @@
-# Don't Remove Credit @VJ_Bots
-# Subscribe YouTube Channel For Amazing Bot @Tech_VJ
-# Ask Doubt on telegram @KingVJ01
-
 import logging
 import asyncio
 import os
@@ -17,6 +13,7 @@ import time
 from datetime import date, datetime
 from config import SHORTLINK_API, SHORTLINK_URL, VERIFY_EXPIRE_TIME
 from shortzy import Shortzy
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,6 +21,43 @@ logger.setLevel(logging.INFO)
 # ग्लोबल डिक्शनरी यूज़र्स का डेटा स्टोर करने के लिए
 TOKENS = {}
 VERIFIED = {}
+
+# 🌟 NEW: यूज़र्स की dynamic settings save karne ke liye global dictionary
+SETTINGS = {}
+
+def get_status_icon(flag):
+    return "✅" if flag else "❌"
+
+# 🌟 NEW: Dynamic Settings Keyboard Generator for Venom File Store
+def generate_settings_keyboard(user_id):
+    # Agar user ki pehle se koi settings save nahi hai, toh default set karein
+    if user_id not in SETTINGS:
+        SETTINGS[user_id] = {
+            "link_shortener": False,
+            "token_verification": False,
+            "custom_caption": True,
+            "force_subscribe": True,
+            "auto_delete": False,
+            "protect_content": False,
+            "stream_download": False
+        }
+    
+    settings = SETTINGS[user_id]
+    
+    keyboard = [
+        [InlineKeyboardButton("⭐ PREMIUM PLAN", callback_data="premium_plan")],
+        [InlineKeyboardButton(f"🔗 LINK SHORTENER - {get_status_icon(settings['link_shortener'])}", callback_data="toggle_link_shortener")],
+        [InlineKeyboardButton(f"🎟️ TOKEN VERIFICATION - {get_status_icon(settings['token_verification'])}", callback_data="toggle_token_verification")],
+        [InlineKeyboardButton(f"📝 CUSTOM CAPTION - {get_status_icon(settings['custom_caption'])}", callback_data="toggle_custom_caption")],
+        [InlineKeyboardButton(f"📢 CUSTOM FORCE SUBSCRIBE - {get_status_icon(settings['force_subscribe'])}", callback_data="toggle_force_subscribe")],
+        [InlineKeyboardButton(f"🗑️ AUTO DELETE - {get_status_icon(settings['auto_delete'])}", callback_data="toggle_auto_delete")],
+        [InlineKeyboardButton("🔗 PERMANENT LINK", callback_data="permanent_link")],
+        [InlineKeyboardButton(f"🔒 PROTECT CONTENT - {get_status_icon(settings['protect_content'])}", callback_data="toggle_protect_content")],
+        [InlineKeyboardButton(f"📥 STREAM/DOWNLOAD - {get_status_icon(settings['stream_download'])}", callback_data="toggle_stream_download")],
+        [InlineKeyboardButton("◀️ BACK", callback_data="back_to_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 
 async def get_verify_shorted_link(link):
     if SHORTLINK_URL == "api.shareus.io":
@@ -83,6 +117,13 @@ async def verify_user(bot, userid, token):
 
 async def check_verification(bot, userid):
     user = await bot.get_users(userid)
+    
+    # 🌟 NEW LOGIC: Agar admin/user ne Token Verification settings se OFF (❌) kiya hua hai,
+    # toh hamesha True return karein (matlab bypass kar de, verification na maange)
+    user_settings = SETTINGS.get(user.id, {})
+    if not user_settings.get("token_verification", False):
+        return True # Verification is turned OFF, allow user directly.
+
     if user.id in VERIFIED.keys():
         last_verified = VERIFIED[user.id]
         # 🌟 UPDATED: करंट टाइम से पिछले वेरिफिकेशन टाइम का अंतर निकाल कर एक्सपायरी चेक करें
