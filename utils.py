@@ -14,18 +14,17 @@ from datetime import date, datetime
 from config import SHORTLINK_API, SHORTLINK_URL, VERIFY_EXPIRE_TIME
 from shortzy import Shortzy
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from plugins.dbusers import db  # 🌟 NEW: MongoDB database class import kiye
+from plugins.dbusers import db  # MongoDB layer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# ग्लोबल डिक्शनरी टोकन मैपिंग के लिए (टोकन टेंपरेरी मेमोरी में ही ठीक हैं)
+# Global dict for tokens validation
 TOKENS = {}
 
 def get_status_icon(flag):
     return "✅" if flag else "❌"
 
-# 🌟 UPDATED: Ab ye function direct database ke pass-on settings ko markup me badlega
 def generate_settings_keyboard(settings):
     keyboard = [
         [InlineKeyboardButton("⭐ PREMIUM PLAN", callback_data="premium_plan")],
@@ -73,41 +72,35 @@ async def check_token(bot, userid, token):
                 return True   
     return False
 
-async def get_token(bot, userid, link):
+# 🌟 FIXED: Ab ye function khali link nahi, balki original file data payload sath me lekar short link banayega
+async def get_token(bot, userid, username, file_data):
     token = ''.join(random.choices(string.ascii_letters + string.digits, k=7))
     
     if int(userid) not in TOKENS:
         TOKENS[int(userid)] = {}
     TOKENS[int(userid)][token] = False
     
-    link = f"{link}verify-{userid}-{token}"
+    # [FIX]: Sahi token format jo file details ko memory me hold rakhega verification ke baad ke liye
+    link = f"https://telegram.me/{username}?start=verify-{userid}-{token}-{file_data}"
     shortened_verify_url = await get_verify_shorted_link(link)
     return str(shortened_verify_url)
 
 async def verify_user(bot, userid, token):
-    # टोकन को Used (True) मार्क करें
     if int(userid) not in TOKENS:
         TOKENS[int(userid)] = {}
     TOKENS[int(userid)][token] = True
-    
-    # 🌟 UPDATED: Ab verification time direct MongoDB permanent database me save hoga
     await db.update_verify_time(int(userid), time.time())
 
 async def check_verification(bot, userid):
-    # 🌟 UPDATED: Direct MongoDB database se settings check hogi RAM se nahi!
     user_settings = await db.get_user_settings(int(userid))
-    
-    # Agar token verification toggled OFF (❌) hai, toh bypass karke seedhe allowed (True) return karein
     if not user_settings.get("token_verification", False):
         return True 
 
-    # 🌟 UPDATED: Verification time data ab seedhe database se secure load hoga
     last_verified = await db.get_verify_time(int(userid))
-    
     if last_verified > 0:
         if (time.time() - last_verified) > VERIFY_EXPIRE_TIME:
-            return False  # Verification Expired
+            return False  
         else:
-            return True   # Verification Valid
+            return True   
     else:
         return False
