@@ -3,7 +3,7 @@
 # Ask Doubt on telegram @KingVJ01
 
 import motor.motor_asyncio
-from config import DB_NAME, DB_URI, DEFAULT_SETTINGS
+from config import DB_NAME, DB_URI, DEFAULT_SETTINGS, ADMIN
 
 class Database:
     
@@ -11,13 +11,15 @@ class Database:
         self._client = motor.motor_asyncio.AsyncIOMotorClient(uri)
         self.db = self._client[database_name]
         self.col = self.db.users
+        # 🌟 NEW: Global settings ke liye ek alag collection ya specific fixed document system
+        self.settings_col = self.db.global_settings
 
     def new_user(self, id, name):
         return dict(
             id = id,
             name = name,
-            verify_time = 0, # 🌟 NEW: Default verification time initialized to 0
-            settings = DEFAULT_SETTINGS.copy() # 🌟 NEW: User ke sath hi uski settings framework save hoga
+            verify_time = 0, 
+            settings = DEFAULT_SETTINGS.copy() 
         )
     
     async def add_user(self, id, name):
@@ -38,7 +40,6 @@ class Database:
     async def delete_user(self, user_id):
         await self.col.delete_many({'id': int(user_id)})
 
-    # 🌟 NEW: User ka verification time database me permanently update karne ke liye
     async def update_verify_time(self, user_id, verify_time):
         await self.col.update_one(
             {'id': int(user_id)},
@@ -46,29 +47,37 @@ class Database:
             upsert=True
         )
 
-    # 🌟 NEW: User ka saved verification time database se fetch karne ke liye
     async def get_verify_time(self, user_id):
         user = await self.col.find_one({'id': int(user_id)})
         return user.get('verify_time', 0) if user else 0
 
-    # 🌟 🌟 🌟 NEW: DYNAMIC SETTINGS MONGODB LAYER 🌟 🌟 🌟
 
-    # 1. Fetch User Settings From DB
-    async def get_user_settings(self, user_id):
-        user = await self.col.find_one({'id': int(user_id)})
-        if user and 'settings' in user:
-            # Agar purana user hai par unki settings database me khali hai toh sync karein
+    # 🌟 🌟 🌟 REFACTORED: GLOBAL ADMIN-CENTRIC SETTINGS LAYER 🌟 🌟 🌟
+    # Ab se user_id kuch bhi aaye, settings hamesha ek hi jagah save hogi aur wahin se pure bot par chalegi.
+
+    # 1. Fetch Global Settings (Jo pure bot ke sabhi users par lagengi)
+    async def get_user_settings(self, user_id=None):
+        # Hum user_id ko bypass kar rahe hain taaki agar koi plugin purane tareeke se bhi call kare, toh galti se user ki personal setting na khule.
+        settings_doc = await self.settings_col.find_one({'id': 'GLOBAL_BOT_SETTINGS'})
+        
+        if settings_doc and 'settings' in settings_doc:
             current_settings = DEFAULT_SETTINGS.copy()
-            current_settings.update(user['settings'])
+            current_settings.update(settings_doc['settings'])
             return current_settings
         
-        # Agar user nahi milta ya settings entry nahi hai toh default return karein
+        # Agar pehli baar chal raha hai aur document nahi mila toh default settings set kar dega database me
+        await self.settings_col.update_one(
+            {'id': 'GLOBAL_BOT_SETTINGS'},
+            {'$set': {'settings': DEFAULT_SETTINGS.copy()}},
+            upsert=True
+        )
         return DEFAULT_SETTINGS.copy()
 
-    # 2. Update Specific Settings Key In DB Permanent
+    # 2. Update Settings Key (Sirf Admin isko trigger karega via buttons)
     async def update_user_setting(self, user_id, key, value):
-        await self.col.update_one(
-            {'id': int(user_id)},
+        # Yahan bhi user_id ignore hokar direct Central Database record update hoga
+        await self.settings_col.update_one(
+            {'id': 'GLOBAL_BOT_SETTINGS'},
             {'$set': {f'settings.{key}': value}},
             upsert=True
         )
