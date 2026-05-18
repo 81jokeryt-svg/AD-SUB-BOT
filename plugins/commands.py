@@ -20,6 +20,7 @@ import json
 import base64
 from urllib.parse import quote_plus
 from TechVJ.utils.file_properties import get_name, get_hash, get_media_file_size
+
 logger = logging.getLogger(__name__)
 
 BATCH_FILES = {}
@@ -79,7 +80,7 @@ async def start(client, message):
 
     data = message.command[1]
     
-    # 1. HANDLE VERIFICATION LINKS (Fixed For Kurigram)
+    # 1. HANDLE VERIFICATION LINKS (Kurigram Timestamp Fixed)
     if data.split("-", 1)[0] == "verify":
         userid = data.split("-", 2)[1]
         token = data.split("-", 3)[2]
@@ -88,16 +89,17 @@ async def start(client, message):
         
         is_valid = await check_token(client, userid, token)
         if is_valid == True:
+            # First: Backend डिक्शनरी में यूज़र को time.time() के साथ एक्टिव मार्क करें
+            await verify_user(client, userid, token)
+            
+            # Second: इसके तुरंत बाद सक्सेस मैसेज और वेरिफिकेशन अलर्ट यूज़र को भेजें
             try:
-                # Kurigram Fix: Pehle user ko text message bheinjein, uske baad backend verify karein
                 await message.reply_text(
                     text=script.VERIFIED_SUCCESS_TEXT.format(message.from_user.mention),
                     protect_content=True
                 )
             except Exception as msg_err:
                 logger.error(f"Error sending verified text: {msg_err}")
-                
-            await verify_user(client, userid, token)
         else:
             return await message.reply_text(text="<b>Invalid link or Expired link !</b>", protect_content=True)
         return
@@ -458,12 +460,6 @@ async def cb_handler(client: Client, query: CallbackQuery):
         except Exception as e:
             logger.error(f"Media edit error: {e}")
 
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await query.message.edit_text(
-            text=script.CLONE_TXT.format(query.from_user.mention),
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        )          
     
     elif query.data == "help":
         await query.answer()
