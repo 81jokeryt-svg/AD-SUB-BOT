@@ -13,8 +13,7 @@ from pyrogram import Client, filters, enums
 from plugins.users_api import get_user, update_user_info
 from pyrogram.errors import ChatAdminRequired, FloodWait
 from pyrogram.types import *
-# 🌟 UPDATED: SETTINGS import kiya dynamic toggles access karne ke liye
-from utils import verify_user, check_token, check_verification, get_token, SETTINGS 
+from utils import verify_user, check_token, check_verification, get_token
 from config import *
 import re
 import json
