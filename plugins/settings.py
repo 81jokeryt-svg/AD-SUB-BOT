@@ -6,7 +6,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from plugins.dbusers import db  # Database mapping module
 from utils import generate_settings_keyboard 
-from config import ADMIN  # Config se ADMIN ID import ki global control ke liye
+from config import *  # Config se ADMIN ID import ki global control ke liye
 
 @Client.on_message(filters.command("settings") & filters.private)
 async def open_settings(client, message):
