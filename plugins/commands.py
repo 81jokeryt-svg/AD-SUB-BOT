@@ -13,7 +13,8 @@ from pyrogram import Client, filters, enums
 from plugins.users_api import get_user, update_user_info
 from pyrogram.errors import ChatAdminRequired, FloodWait
 from pyrogram.types import *
-from utils import verify_user, check_token, check_verification, get_token
+# 🌟 UPDATED: SETTINGS import kiya dynamic toggles access karne ke liye
+from utils import verify_user, check_token, check_verification, get_token, SETTINGS 
 from config import *
 import re
 import json
@@ -57,6 +58,9 @@ async def start(client, message):
         await db.add_user(user_id, message.from_user.first_name)
         await client.send_message(LOG_CHANNEL, script.LOG_TEXT.format(user_id, message.from_user.mention))
     
+    # 🌟 NEW: Fetch current settings or apply global config defaults
+    user_settings = SETTINGS.get(user_id, DEFAULT_SETTINGS)
+
     if len(message.command) != 2:
         buttons = [[
             InlineKeyboardButton('💝 sᴜʙsᴄʀɪʙᴇ ᴍʏ ʏᴏᴜᴛᴜʙᴇ ᴄʜᴀɴɴᴇʟ', url='https://youtube.com/@Tech_VJ')
@@ -80,19 +84,20 @@ async def start(client, message):
 
     data = message.command[1]
     
-    # 1. HANDLE VERIFICATION LINKS (Kurigram Timestamp Fixed)
+    # 1. HANDLE VERIFICATION LINKS
     if data.split("-", 1)[0] == "verify":
-        userid = data.split("-", 2)[1]
-        token = data.split("-", 3)[2]
+        userid = data.split("-", 1)[1].split("-", 1)[0] if "-" in data else data.split("-", 1)[1]
+        try:
+            token = data.split("-", 2)[2]
+        except IndexError:
+            token = "DIRECT_TOKEN"
+
         if str(user_id) != str(userid):
             return await message.reply_text(text="<b>Invalid link or Expired link !</b>", protect_content=True)
         
-        is_valid = await check_token(client, userid, token)
-        if is_valid == True:
-            # First: Backend डिक्शनरी में यूज़र को time.time() के साथ एक्टिव मार्क करें
+        # Check token logic or bypass if direct token
+        if token == "DIRECT_TOKEN" or await check_token(client, userid, token):
             await verify_user(client, userid, token)
-            
-            # Second: इसके तुरंत बाद सक्सेस मैसेज और वेरिफिकेशन अलर्ट यूज़र को भेजें
             try:
                 await message.reply_text(
                     text=script.VERIFIED_SUCCESS_TEXT.format(message.from_user.mention),
@@ -107,18 +112,27 @@ async def start(client, message):
     # 2. HANDLE BATCH LINKS
     elif data.split("-", 1)[0] == "BATCH":
         try:
-            if not await check_verification(client, user_id) and VERIFY_MODE == True:
-                not_verified_buttons = [
-                    [InlineKeyboardButton("🚀 CLICK HERE TO VERIFY", url=await get_token(client, user_id, f"https://telegram.me/{username}?start="))],
-                    [InlineKeyboardButton("👑 BUY PREMIUM / PLANS", callback_data="open_premium_plans")],
-                    [InlineKeyboardButton("❓ HOW TO VERIFY", url=VERIFY_TUTORIAL)]
-                ]
-                await message.reply_text(
-                    text=script.NOT_VERIFIED_TEXT,
-                    protect_content=True,
-                    reply_markup=InlineKeyboardMarkup(not_verified_buttons)
-                )
-                return
+            # 🌟 UPDATED: Dynamic validation based on dashboard button toggles
+            if user_settings.get("token_verification", VERIFY_MODE):
+                if not await check_verification(client, user_id):
+                    
+                    # Dashboard settings ke shortener button check status
+                    if user_settings.get("link_shortener", False):
+                        verify_url = await get_token(client, user_id, f"https://telegram.me/{username}?start=")
+                    else:
+                        verify_url = f"https://telegram.me/{username}?start=verify-{user_id}-DIRECT_TOKEN"
+
+                    not_verified_buttons = [
+                        [InlineKeyboardButton("🚀 CLICK HERE TO VERIFY", url=verify_url)],
+                        [InlineKeyboardButton("👑 BUY PREMIUM / PLANS", callback_data="open_premium_plans")],
+                        [InlineKeyboardButton("❓ HOW TO VERIFY", url=VERIFY_TUTORIAL)]
+                    ]
+                    await message.reply_text(
+                        text=script.NOT_VERIFIED_TEXT,
+                        protect_content=True,
+                        reply_markup=InlineKeyboardMarkup(not_verified_buttons)
+                    )
+                    return
         except Exception as e:
             return await message.reply_text(f"**Error - {e}**")
             
@@ -167,11 +181,16 @@ async def start(client, message):
                     title = formate_file_name(old_title)
                     
                     size = get_size(int(file.file_size)) if hasattr(file, "file_size") else "Unknown"
-                    if BATCH_FILE_CAPTION:
+                    
+                    # 🌟 UPDATED: Render caption dynamic checking as per dashboard configuration
+                    if user_settings.get("custom_caption", True) and BATCH_FILE_CAPTION:
                         try:
                             f_caption = BATCH_FILE_CAPTION.format(file_name='' if title is None else title, file_size='' if size is None else size, file_caption='' if f_caption is None else f_caption)
                         except:
                             f_caption = f_caption
+                    elif not user_settings.get("custom_caption", True):
+                        f_caption = "" # Clear custom framing if button is toggled off
+                        
                     if f_caption is None:
                         f_caption = f"@VJ_Bots {title}"
                         
@@ -187,16 +206,20 @@ async def start(client, message):
                         reply_markup = InlineKeyboardMarkup(button)
                     else:
                         reply_markup = None
-                        
-                    msg_out = await info.copy(chat_id=message.from_user.id, caption=f_caption, protect_content=False, reply_markup=reply_markup)
+                    
+                    # 🌟 UPDATED: Content forwarding security maps toggles status layer
+                    is_protected = user_settings.get("protect_content", False)
+                    msg_out = await info.copy(chat_id=message.from_user.id, caption=f_caption, protect_content=is_protected, reply_markup=reply_markup)
                 else:
-                    msg_out = await info.copy(chat_id=message.from_user.id, protect_content=False)
+                    is_protected = user_settings.get("protect_content", False)
+                    msg_out = await info.copy(chat_id=message.from_user.id, protect_content=is_protected)
                 
                 filesarr.append(msg_out)
                 await asyncio.sleep(1)
             except FloodWait as e:
                 await asyncio.sleep(e.value)
-                msg_out = await info.copy(chat_id=message.from_user.id, protect_content=False)
+                is_protected = user_settings.get("protect_content", False)
+                msg_out = await info.copy(chat_id=message.from_user.id, protect_content=is_protected)
                 filesarr.append(msg_out)
             except Exception as e:
                 logger.error(f"Error copying batch sub-file: {e}")
@@ -216,18 +239,26 @@ async def start(client, message):
         return
 
     # 3. HANDLE SINGLE FILE / PHOTO LINKS
-    if not await check_verification(client, user_id) and VERIFY_MODE == True:
-        not_verified_buttons = [
-            [InlineKeyboardButton("🚀 CLICK HERE TO VERIFY", url=await get_token(client, user_id, f"https://telegram.me/{username}?start="))],
-            [InlineKeyboardButton("👑 BUY PREMIUM / PLANS", callback_data="open_premium_plans")],
-            [InlineKeyboardButton("❓ HOW TO VERIFY", url=VERIFY_TUTORIAL)]
-        ]
-        await message.reply_text(
-            text=script.NOT_VERIFIED_TEXT,
-            protect_content=True,
-            reply_markup=InlineKeyboardMarkup(not_verified_buttons)
-        )
-        return
+    if user_settings.get("token_verification", VERIFY_MODE):
+        if not await check_verification(client, user_id):
+            
+            # Dashboard system dynamic link generation parsing router
+            if user_settings.get("link_shortener", False):
+                verify_url = await get_token(client, user_id, f"https://telegram.me/{username}?start=")
+            else:
+                verify_url = f"https://telegram.me/{username}?start=verify-{user_id}-DIRECT_TOKEN"
+
+            not_verified_buttons = [
+                [InlineKeyboardButton("🚀 CLICK HERE TO VERIFY", url=verify_url)],
+                [InlineKeyboardButton("👑 BUY PREMIUM / PLANS", callback_data="open_premium_plans")],
+                [InlineKeyboardButton("❓ HOW TO VERIFY", url=VERIFY_TUTORIAL)]
+            ]
+            await message.reply_text(
+                text=script.NOT_VERIFIED_TEXT,
+                protect_content=True,
+                reply_markup=InlineKeyboardMarkup(not_verified_buttons)
+            )
+            return
 
     try:
         decoded_bytes = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
@@ -247,12 +278,16 @@ async def start(client, message):
             size = get_size(media.file_size) if hasattr(media, "file_size") else "Unknown"
             
             f_caption = f"@VJ_Bots <code>{title}</code>"
-            if CUSTOM_FILE_CAPTION:
+            
+            # 🌟 UPDATED: Render custom structures layer checking 
+            if user_settings.get("custom_caption", True) and CUSTOM_FILE_CAPTION:
                 try:
                     f_caption=CUSTOM_FILE_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='')
                 except:
                     pass
-            
+            elif not user_settings.get("custom_caption", True):
+                f_caption = ""
+
             if STREAM_MODE == True and (msg.video or msg.document):
                 log_msg = msg
                 stream = f"{URL}watch/{str(log_msg.id)}/{quote_plus(get_name(log_msg))}?hash={get_hash(log_msg)}"
@@ -267,9 +302,11 @@ async def start(client, message):
             else:
                 reply_markup = None
                 
-            del_msg = await msg.copy(chat_id=message.from_user.id, caption=f_caption, reply_markup=reply_markup, protect_content=False)
+            is_protected = user_settings.get("protect_content", False)
+            del_msg = await msg.copy(chat_id=message.from_user.id, caption=f_caption, reply_markup=reply_markup, protect_content=is_protected)
         else:
-            del_msg = await msg.copy(chat_id=message.from_user.id, protect_content=False)
+            is_protected = user_settings.get("protect_content", False)
+            del_msg = await msg.copy(chat_id=message.from_user.id, protect_content=is_protected)
             
         if AUTO_DELETE_MODE == True:
             k = await client.send_message(chat_id = message.from_user.id, text=f"<b><u>❗️❗️❗️IMPORTANT❗️️❗️❗️</u></b>\n\nThis Movie File/Video will be deleted in <b><u>{AUTO_DELETE} minutes</u> 🫥 <i></b>(Due to Copyright Issues)</i>.\n\n<b><i>Please forward this File/Video to your Saved Messages and Start Download there</b>")
@@ -448,7 +485,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
     elif query.data == "clone":
         await query.answer()
         buttons = [[
-            InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
+            InlineKeyboardButton('Hᴏᴍｅ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
         try:
@@ -464,7 +501,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
     elif query.data == "help":
         await query.answer()
         buttons = [[
-            InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
+            InlineKeyboardButton('Hᴏᴍｅ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
         try:
