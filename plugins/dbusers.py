@@ -3,7 +3,7 @@
 # Ask Doubt on telegram @KingVJ01
 
 import motor.motor_asyncio
-from config import DB_NAME, DB_URI
+from config import DB_NAME, DB_URI, DEFAULT_SETTINGS
 
 class Database:
     
@@ -16,7 +16,8 @@ class Database:
         return dict(
             id = id,
             name = name,
-            verify_time = 0 # 🌟 NEW: Default verification time initialized to 0
+            verify_time = 0, # 🌟 NEW: Default verification time initialized to 0
+            settings = DEFAULT_SETTINGS.copy() # 🌟 NEW: User ke sath hi uski settings framework save hoga
         )
     
     async def add_user(self, id, name):
@@ -50,7 +51,27 @@ class Database:
         user = await self.col.find_one({'id': int(user_id)})
         return user.get('verify_time', 0) if user else 0
 
+    # 🌟 🌟 🌟 NEW: DYNAMIC SETTINGS MONGODB LAYER 🌟 🌟 🌟
+
+    # 1. Fetch User Settings From DB
+    async def get_user_settings(self, user_id):
+        user = await self.col.find_one({'id': int(user_id)})
+        if user and 'settings' in user:
+            # Agar purana user hai par unki settings database me khali hai toh sync karein
+            current_settings = DEFAULT_SETTINGS.copy()
+            current_settings.update(user['settings'])
+            return current_settings
+        
+        # Agar user nahi milta ya settings entry nahi hai toh default return karein
+        return DEFAULT_SETTINGS.copy()
+
+    # 2. Update Specific Settings Key In DB Permanent
+    async def update_user_setting(self, user_id, key, value):
+        await self.col.update_one(
+            {'id': int(user_id)},
+            {'$set': {f'settings.{key}': value}},
+            upsert=True
+        )
+
 
 db = Database(DB_URI, DB_NAME)
-
-# dbusers.py
