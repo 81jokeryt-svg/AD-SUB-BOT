@@ -79,19 +79,24 @@ async def start(client, message):
 
     data = message.command[1]
     
-    # 1. HANDLE VERIFICATION LINKS
+    # 1. HANDLE VERIFICATION LINKS (Fixed For Kurigram)
     if data.split("-", 1)[0] == "verify":
         userid = data.split("-", 2)[1]
         token = data.split("-", 3)[2]
         if str(user_id) != str(userid):
             return await message.reply_text(text="<b>Invalid link or Expired link !</b>", protect_content=True)
+        
         is_valid = await check_token(client, userid, token)
         if is_valid == True:
-            # 🌟 UPDATED: Ab verified text direct Script.py se utha kar user mention format karega
-            await message.reply_text(
-                text=script.VERIFIED_SUCCESS_TEXT.format(message.from_user.mention),
-                protect_content=True
-            )
+            try:
+                # Kurigram Fix: Pehle user ko text message bheinjein, uske baad backend verify karein
+                await message.reply_text(
+                    text=script.VERIFIED_SUCCESS_TEXT.format(message.from_user.mention),
+                    protect_content=True
+                )
+            except Exception as msg_err:
+                logger.error(f"Error sending verified text: {msg_err}")
+                
             await verify_user(client, userid, token)
         else:
             return await message.reply_text(text="<b>Invalid link or Expired link !</b>", protect_content=True)
@@ -355,7 +360,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(plan_buttons)
         )
         
-    # 🌟 CALLBACK: QR SELECTION LAYER (Naya Photo Drop reply)
+    # 🌟 CALLBACK: QR SELECTION LAYER
     elif query.data == "pay_via_qr":
         await query.answer("Loading QR Code... 🖼️")
         qr_buttons = [
@@ -368,7 +373,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(qr_buttons)
         )
         
-    # 🌟 CALLBACK: UPI SELECTION LAYER (Naya text Drop reply)
+    # 🌟 CALLBACK: UPI SELECTION LAYER
     elif query.data == "pay_via_upi":
         await query.answer("Loading UPI Details... 💳")
         upi_buttons = [
@@ -386,15 +391,20 @@ async def cb_handler(client: Client, query: CallbackQuery):
         await query.message.delete()
         
     elif query.data == "about":
+        await query.answer()
         buttons = [[
             InlineKeyboardButton('Hᴏᴍｅ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        try:
+            await client.edit_message_media(
+                query.message.chat.id, 
+                query.message.id, 
+                InputMediaPhoto(random.choice(PICS))
+            )
+        except Exception as e:
+            logger.error(f"Media edit error: {e}")
+
         reply_markup = InlineKeyboardMarkup(buttons)
         me2 = (await client.get_me()).mention
         await query.message.edit_text(
@@ -404,6 +414,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     
     elif query.data == "start":
+        await query.answer()
         buttons = [[
             InlineKeyboardButton('💝 sᴜʙsᴄʀɪʙᴇ ᴍʏ ʏᴏᴜᴛᴜʙᴇ ᴄʜᴀɴɴᴇʟ', url='https://youtube.com/@Tech_VJ')
         ],[
@@ -416,11 +427,15 @@ async def cb_handler(client: Client, query: CallbackQuery):
         if CLONE_MODE == True:
             buttons.append([InlineKeyboardButton('🤖 ᴄʀᴇᴀᴛᴇ ʏᴏᴜʀ ᴏᴡɴ ᴄʟᴏɴᴇ ʙᴏᴛ', callback_data='clone')])
         reply_markup = InlineKeyboardMarkup(buttons)
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        try:
+            await client.edit_message_media(
+                query.message.chat.id, 
+                query.message.id, 
+                InputMediaPhoto(random.choice(PICS))
+            )
+        except Exception as e:
+            logger.error(f"Media edit error: {e}")
+
         me2 = (await client.get_me()).mention
         await query.message.edit_text(
             text=script.START_TXT.format(query.from_user.mention, me2),
@@ -429,15 +444,20 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )
     
     elif query.data == "clone":
+        await query.answer()
         buttons = [[
             InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        try:
+            await client.edit_message_media(
+                query.message.chat.id, 
+                query.message.id, 
+                InputMediaPhoto(random.choice(PICS))
+            )
+        except Exception as e:
+            logger.error(f"Media edit error: {e}")
+
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
             text=script.CLONE_TXT.format(query.from_user.mention),
@@ -446,15 +466,20 @@ async def cb_handler(client: Client, query: CallbackQuery):
         )          
     
     elif query.data == "help":
+        await query.answer()
         buttons = [[
             InlineKeyboardButton('Hᴏᴍᴇ', callback_data='start'),
             InlineKeyboardButton('🔒 Cʟᴏsᴇ', callback_data='close_data')
         ]]
-        await client.edit_message_media(
-            query.message.chat.id, 
-            query.message.id, 
-            InputMediaPhoto(random.choice(PICS))
-        )
+        try:
+            await client.edit_message_media(
+                query.message.chat.id, 
+                query.message.id, 
+                InputMediaPhoto(random.choice(PICS))
+            )
+        except Exception as e:
+            logger.error(f"Media edit error: {e}")
+            
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
             text=script.HELP_TXT,
