@@ -90,6 +90,19 @@ else:
 URL = environ.get("URL", "https://testofvjfilter-1fa60b1b8498.herokuapp.com/")
 
 
+# 🌟 🌟 🌟 NEW: DYNAMIC PREMIUM SETTINGS FOR VENOM MENU 🌟 🌟 🌟
+# Yeh settings check karegi ki user ke dynamic menu ka base configuration kya hona chahiye.
+DEFAULT_SETTINGS = {
+    "link_shortener": is_enabled(environ.get("LINK_SHORTENER_DEFAULT", "False"), False),
+    "token_verification": is_enabled(environ.get("TOKEN_VERIFY_DEFAULT", "False"), False),
+    "custom_caption": is_enabled(environ.get("CUSTOM_CAPTION_DEFAULT", "True"), True),
+    "force_subscribe": is_enabled(environ.get("FORCE_SUB_DEFAULT", "True"), True),
+    "auto_delete": is_enabled(environ.get("AUTO_DELETE_DEFAULT", "False"), False),
+    "protect_content": is_enabled(environ.get("PROTECT_CONTENT_DEFAULT", "False"), False),
+    "stream_download": is_enabled(environ.get("STREAM_DOWNLOAD_DEFAULT", "False"), False)
+}
+
+
 # Don't Remove Credit Tg - @VJ_Bots
 # Subscribe YouTube Channel For Amazing Bot https://youtube.com/@Tech_VJ
 # Ask Doubt on telegram @KingVJ01_
